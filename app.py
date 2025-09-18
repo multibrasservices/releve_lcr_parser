@@ -40,7 +40,7 @@ def auto_collapse_sidebar():
                 if (collapseButton && collapseButton.getAttribute('aria-expanded') === 'true') {
                     collapseButton.click();
                 }
-            }, 7000); // Délai de 7000 millisecondes (7 secondes)
+            }, 5000); // Délai de 5000 millisecondes (5 secondes)
         </script>
         """
         # Injecte le code JavaScript dans l'application
