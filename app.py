@@ -1,3 +1,5 @@
+
+### Le `app.py` Final pour le Déploiement
 # --- IMPORTS DE L'APPLICATION ---
 import streamlit as st
 import pandas as pd
@@ -7,7 +9,6 @@ import plotly.express as px
 
 # --- IMPORTS POUR L'AUTHENTIFICATION ---
 import streamlit_authenticator as stauth
-# Note : 'yaml' n'est plus nécessaire pour le déploiement car on n'ouvre plus le fichier config.yaml
 
 # --- Constantes pour les noms de colonnes ---
 COL_SAISI = "Saisi"
@@ -23,7 +24,7 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# --- Fonction d'extraction PDF ---
+# --- (Toutes vos fonctions main, display_summary, etc. restent ici, inchangées) ---
 @st.cache_data
 def extract_data_from_pdf(file):
     data = []
@@ -46,8 +47,6 @@ def extract_data_from_pdf(file):
     except Exception as e:
         st.warning(f"Impossible de lire un fichier PDF. Est-il corrompu ? Erreur: {e}")
     return data
-
-# --- Fonctions de l'interface utilisateur (UI) ---
 
 def display_summary(df):
     st.subheader("Synthèse du reste à payer")
@@ -151,7 +150,6 @@ def to_excel(df):
             main_worksheet.insert_chart('J2', chart)
     return output.getvalue()
 
-# --- Application Principale ---
 def main():
     st.markdown("""<style>.stApp, .stApp div, .stApp span, .stApp p { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
     st.title("📊 Synthèse des LCR à Payer")
@@ -166,7 +164,7 @@ def main():
     st.markdown("---")
     master_df = st.session_state.df
     edited_df = st.data_editor(master_df, column_config={COL_SAISI: st.column_config.CheckboxColumn(f"{COL_SAISI} ?", default=False), COL_ECHEANCE: st.column_config.DateColumn(COL_ECHEANCE, format="DD/MM/YYYY"), COL_TIREUR: st.column_config.TextColumn(COL_TIREUR), COL_OPERATION: st.column_config.TextColumn(COL_OPERATION), COL_MONTANT: st.column_config.NumberColumn(f"{COL_MONTANT} (€)", format="%.2f €"),}, use_container_width=True, hide_index=True, num_rows="dynamic", key="data_editor")
-    st.session_state.df = edited_df
+    st.session_state.df = edited_ditor
     st.markdown("---")
     hide_completed = st.checkbox("Masquer les opérations déjà saisies dans la synthèse", value=False)
     df_for_summary = st.session_state.df
@@ -188,19 +186,19 @@ def main():
 
 # --- LOGIQUE DE DÉMARRAGE PRÊTE POUR LE DÉPLOIEMENT ---
 if __name__ == "__main__":
-    
-    # Configuration de l'authentificateur à partir de st.secrets
+
+    # Copie des secrets en lecture seule vers un dictionnaire modifiable
+    credentials = st.secrets["credentials"].to_dict()
+
     authenticator = stauth.Authenticate(
-        st.secrets['credentials'],
+        credentials,
         st.secrets['cookie']['name'],
         st.secrets['cookie']['key'],
         st.secrets['cookie']['expiry_days']
     )
 
-    # Affichage du formulaire de connexion
     authenticator.login()
 
-    # Vérification du statut de connexion via st.session_state
     if st.session_state["authentication_status"]:
         with st.sidebar:
             st.title(f"Bienvenue *{st.session_state['name']}*")
