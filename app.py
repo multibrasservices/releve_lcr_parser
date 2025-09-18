@@ -7,8 +7,7 @@ import plotly.express as px
 
 # --- IMPORTS POUR L'AUTHENTIFICATION ---
 import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
+# Note : 'yaml' n'est plus nécessaire pour le déploiement car on n'ouvre plus le fichier config.yaml
 
 # --- Constantes pour les noms de colonnes ---
 COL_SAISI = "Saisi"
@@ -187,24 +186,21 @@ def main():
     else:
         st.warning("Aucune donnée à exporter pour la sélection en cours.")
 
-# --- LOGIQUE DE DÉMARRAGE AVEC AUTHENTIFICATION (UTILISANT st.session_state) ---
+# --- LOGIQUE DE DÉMARRAGE PRÊTE POUR LE DÉPLOIEMENT ---
 if __name__ == "__main__":
-    try:
-        with open('config.yaml') as file:
-            config = yaml.load(file, Loader=SafeLoader)
-    except FileNotFoundError:
-        st.error("Le fichier 'config.yaml' est introuvable. Assurez-vous qu'il est dans le même dossier que app.py.")
-        st.stop()
-
+    
+    # Configuration de l'authentificateur à partir de st.secrets
     authenticator = stauth.Authenticate(
-        config['credentials'],
-        config['cookie']['name'],
-        config['cookie']['key'],
-        config['cookie']['expiry_days']
+        st.secrets['credentials'],
+        st.secrets['cookie']['name'],
+        st.secrets['cookie']['key'],
+        st.secrets['cookie']['expiry_days']
     )
 
+    # Affichage du formulaire de connexion
     authenticator.login()
 
+    # Vérification du statut de connexion via st.session_state
     if st.session_state["authentication_status"]:
         with st.sidebar:
             st.title(f"Bienvenue *{st.session_state['name']}*")
