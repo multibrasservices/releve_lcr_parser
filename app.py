@@ -1,4 +1,3 @@
-
 ### Le `app.py` Final pour le Déploiement
 # --- IMPORTS DE L'APPLICATION ---
 import streamlit as st
@@ -164,7 +163,10 @@ def main():
     st.markdown("---")
     master_df = st.session_state.df
     edited_df = st.data_editor(master_df, column_config={COL_SAISI: st.column_config.CheckboxColumn(f"{COL_SAISI} ?", default=False), COL_ECHEANCE: st.column_config.DateColumn(COL_ECHEANCE, format="DD/MM/YYYY"), COL_TIREUR: st.column_config.TextColumn(COL_TIREUR), COL_OPERATION: st.column_config.TextColumn(COL_OPERATION), COL_MONTANT: st.column_config.NumberColumn(f"{COL_MONTANT} (€)", format="%.2f €"),}, use_container_width=True, hide_index=True, num_rows="dynamic", key="data_editor")
-    st.session_state.df = edited_ditor
+    
+    # --- CORRECTION APPLIQUÉE ICI ---
+    st.session_state.df = edited_df
+    
     st.markdown("---")
     hide_completed = st.checkbox("Masquer les opérations déjà saisies dans la synthèse", value=False)
     df_for_summary = st.session_state.df
