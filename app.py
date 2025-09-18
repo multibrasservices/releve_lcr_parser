@@ -5,6 +5,7 @@ import pandas as pd
 import pdfplumber
 from io import BytesIO
 import plotly.express as px
+import streamlit.components.v1 as components  # <-- NOUVEL IMPORT
 
 # --- IMPORTS POUR L'AUTHENTIFICATION ---
 import streamlit_authenticator as stauth
@@ -20,10 +21,36 @@ COL_MONTANT = "Montant"
 st.set_page_config(
     layout="wide",
     page_title="Synthèse LCR",
-    page_icon="📊"
+    page_icon="📊",
+    initial_sidebar_state="expanded" # S'assure que la sidebar est ouverte au départ
 )
 
-# --- (Toutes vos fonctions main, display_summary, etc. restent ici, inchangées) ---
+# --- NOUVELLE FONCTION POUR RÉTRACTER LA SIDEBAR ---
+def auto_collapse_sidebar():
+    # S'assure que cela ne s'exécute qu'une seule fois par session
+    if 'sidebar_collapsed' not in st.session_state:
+        # Le code JavaScript pour trouver le bouton de la sidebar et cliquer dessus
+        js_code = """
+        <script>
+            setTimeout(function() {
+                // Cible le bouton de la sidebar en utilisant un sélecteur stable
+                const collapseButton = window.parent.document.querySelector('[data-testid="stSidebarNavCollapseButton"]');
+                
+                // Vérifie si le bouton existe et si la sidebar est actuellement ouverte
+                if (collapseButton && collapseButton.getAttribute('aria-expanded') === 'true') {
+                    collapseButton.click();
+                }
+            }, 3000); // Délai de 3000 millisecondes (3 secondes)
+        </script>
+        """
+        # Injecte le code JavaScript dans l'application
+        components.html(js_code, height=0, width=0)
+        
+        # Marque que l'opération a été effectuée pour cette session
+        st.session_state.sidebar_collapsed = True
+
+
+# --- (Toutes vos autres fonctions restent inchangées) ---
 @st.cache_data
 def extract_data_from_pdf(file):
     data = []
@@ -150,6 +177,9 @@ def to_excel(df):
     return output.getvalue()
 
 def main():
+    # --- APPEL DE LA NOUVELLE FONCTION ---
+    auto_collapse_sidebar()
+    
     st.markdown("""<style>.stApp, .stApp div, .stApp span, .stApp p { font-size: 1.1rem; }</style>""", unsafe_allow_html=True)
     st.title("📊 Synthèse des LCR à Payer")
     st.markdown("Chargez vos relevés LCR au format PDF pour générer une synthèse interactive.")
@@ -203,7 +233,6 @@ if __name__ == "__main__":
             st.title(f"Bienvenue *{st.session_state['name']}*")
             authenticator.logout()
             
-            # --- AJOUTS DEMANDÉS ---
             st.markdown("---")
             st.info("Version 19.09.25")
             st.info("© multibrasservices@gmail.com")
@@ -212,4 +241,4 @@ if __name__ == "__main__":
     elif st.session_state["authentication_status"] is False:
         st.error('Nom d’utilisateur ou mot de passe incorrect')
     elif st.session_state["authentication_status"] is None:
-        st.warning('Veuillez entrer votre nom d’utilisateur et votre mot de passe')
+        st.warning('Veuillez entrer votre nom d’utilisateur et votre mot de passe')```
