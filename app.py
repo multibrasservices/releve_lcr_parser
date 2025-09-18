@@ -163,10 +163,7 @@ def main():
     st.markdown("---")
     master_df = st.session_state.df
     edited_df = st.data_editor(master_df, column_config={COL_SAISI: st.column_config.CheckboxColumn(f"{COL_SAISI} ?", default=False), COL_ECHEANCE: st.column_config.DateColumn(COL_ECHEANCE, format="DD/MM/YYYY"), COL_TIREUR: st.column_config.TextColumn(COL_TIREUR), COL_OPERATION: st.column_config.TextColumn(COL_OPERATION), COL_MONTANT: st.column_config.NumberColumn(f"{COL_MONTANT} (€)", format="%.2f €"),}, use_container_width=True, hide_index=True, num_rows="dynamic", key="data_editor")
-    
-    # --- CORRECTION APPLIQUÉE ICI ---
     st.session_state.df = edited_df
-    
     st.markdown("---")
     hide_completed = st.checkbox("Masquer les opérations déjà saisies dans la synthèse", value=False)
     df_for_summary = st.session_state.df
@@ -205,6 +202,12 @@ if __name__ == "__main__":
         with st.sidebar:
             st.title(f"Bienvenue *{st.session_state['name']}*")
             authenticator.logout()
+            
+            # --- AJOUTS DEMANDÉS ---
+            st.markdown("---")
+            st.info("Version 19.09.25")
+            st.info("© multibrasservices@gmail.com")
+            
         main()
     elif st.session_state["authentication_status"] is False:
         st.error('Nom d’utilisateur ou mot de passe incorrect')
