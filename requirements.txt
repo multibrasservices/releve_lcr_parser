@@ -1,8 +1,7 @@
-streamlit
-pandas
-pdfplumber
-plotly
-streamlit-authenticator
-pyyaml
-xlsxwriter
-openpyxl
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pdfplumber==0.11.4
+pandas==2.2.3
+XlsxWriter==3.2.0
+python-multipart==0.0.9
+httpx==0.27.2

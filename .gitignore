@@ -1,10 +1,16 @@
-# Ignorer l'environnement virtuel
+# Environnement virtuel
 venv/
 .venv/
 
-# Ignorer les fichiers de configuration sensibles
+# Secrets & config locale
+.env
 config.yaml
 
-# Ignorer les caches Python
+# Caches Python
 __pycache__/
 *.pyc
+*.py[cod]
+
+# Fichiers de test / sorties
+*.pdf
+*.xlsx

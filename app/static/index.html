@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Synthèse LCR → Excel · ZoomAli.io</title>
+  <link rel="icon" href="/static/images/lcr-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --primary-dark: #1b3a4b;
+      --primary:      #2e86ab;
+      --accent:       #3ecf9f;
+      --accent-hover: #34b88c;
+      --light:        #e9f5f1;
+      --white:        #ffffff;
+      --gray-bg:      #f0f2f5;
+      --gray-border:  #dde1e7;
+      --text-muted:   #6b7280;
+      --error:        #c62828;
+      --error-bg:     #fff5f5;
+      --neg:          #c73e1d;
+      --font-heading: 'Montserrat', sans-serif;
+      --font-body:    'Source Sans 3', sans-serif;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--gray-bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: var(--primary-dark);
+      padding: 5rem 1rem 3rem;
+    }
+
+    /* ── Topnav ──────────────────────────────────────── */
+    .topnav {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 1.5rem;
+      background: var(--white);
+      border-bottom: 1px solid var(--gray-border);
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 10;
+    }
+    .topnav-left { display: flex; align-items: center; gap: 0.75rem; }
+    .topnav-left img { height: 38px; }
+    .topnav-tool-name { font-family: var(--font-heading); font-weight: 600; font-size: 0.95rem; color: var(--primary-dark); }
+    .topnav-subtitle { font-size: 0.75rem; color: var(--text-muted); }
+    .topnav-right { display: flex; align-items: center; gap: 1.25rem; }
+    .back-link { font-size: 0.85rem; color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+    .back-link:hover { color: var(--accent); }
+    .btn-logout-nav {
+      font-size: 0.85rem; color: var(--primary-dark);
+      background: transparent; border: 1px solid var(--gray-border);
+      border-radius: 6px; padding: 6px 14px; cursor: pointer;
+      font-family: var(--font-body); transition: all 0.2s;
+    }
+    .btn-logout-nav:hover { border-color: var(--accent); }
+
+    /* ── Auth loader ─────────────────────────────────── */
+    #auth-loader { display: flex; flex-direction: column; align-items: center; gap: 1rem; color: var(--text-muted); font-size: 0.9rem; margin-top: 4rem; }
+    .spinner { width: 32px; height: 32px; border: 3px solid var(--gray-border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── App ─────────────────────────────────────────── */
+    #app { display: none; width: 100%; max-width: 1100px; flex-direction: column; align-items: center; }
+    #app.visible { display: flex; }
+
+    /* ── Accès refusé ────────────────────────────────── */
+    #access-denied { display: none; flex-direction: column; align-items: center; text-align: center; gap: 1rem; max-width: 420px; margin-top: 4rem; }
+    #access-denied.visible { display: flex; }
+    #access-denied .denied-icon { font-size: 2.8rem; }
+    #access-denied h2 { font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; }
+    #access-denied p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; }
+    #access-denied a { margin-top: 0.5rem; padding: 12px 22px; background: var(--primary-dark); color: var(--white); border-radius: 8px; text-decoration: none; font-family: var(--font-heading); font-size: 0.95rem; font-weight: 600; transition: background 0.2s; }
+    #access-denied a:hover { background: var(--accent); }
+
+    /* ── Header ──────────────────────────────────────── */
+    .header { text-align: center; margin-bottom: 1.75rem; }
+    .header h1 { font-family: var(--font-heading); font-size: 1.6rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .header h1 span { color: var(--accent); }
+    .header p { color: var(--text-muted); font-size: 0.95rem; max-width: 460px; line-height: 1.5; margin: 0 auto; }
+
+    /* ── Card ────────────────────────────────────────── */
+    .card { background: var(--white); border-radius: 14px; box-shadow: 0 4px 28px rgba(0,0,0,0.07); padding: 1.75rem; width: 100%; margin-bottom: 1.5rem; }
+    .card-upload { max-width: 520px; }
+    .card h2 { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+
+    /* ── Drop zone ───────────────────────────────────── */
+    .dropzone { border: 2px dashed var(--gray-border); border-radius: 10px; padding: 2.25rem 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--gray-bg); position: relative; }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: var(--light); }
+    .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .dropzone-icon { font-size: 2.2rem; margin-bottom: 0.6rem; }
+    .dropzone-text { font-family: var(--font-heading); font-size: 0.95rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .dropzone-hint { font-size: 0.82rem; color: var(--text-muted); }
+
+    .file-list { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .file-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; background: var(--light); border: 1px solid #bfe3d6; border-radius: 8px; font-size: 0.88rem; }
+    .file-row .fname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-row .fsize { color: var(--text-muted); font-size: 0.78rem; margin-left: auto; flex-shrink: 0; }
+
+    /* ── Boutons ─────────────────────────────────────── */
+    .btn { padding: 13px 18px; border: none; border-radius: 8px; font-family: var(--font-heading); font-size: 0.98rem; font-weight: 600; cursor: pointer; transition: background 0.2s, opacity 0.2s; }
+    .btn-primary { width: 100%; margin-top: 1.1rem; background: var(--primary-dark); color: var(--white); }
+    .btn-primary:hover:not(:disabled) { background: var(--accent); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--gray-border); font-family: var(--font-body); font-weight: 500; font-size: 0.88rem; padding: 9px 14px; }
+    .btn-ghost:hover { background: var(--gray-bg); border-color: var(--accent); color: var(--primary-dark); }
+
+    /* ── Progression ─────────────────────────────────── */
+    .progress-wrap { display: none; margin-top: 1.1rem; }
+    .progress-wrap.visible { display: block; }
+    .progress-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; display: flex; justify-content: space-between; }
+    .progress-bar-track { height: 8px; background: var(--gray-border); border-radius: 100px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 100px; width: 0%; transition: width 0.3s ease; }
+    .progress-bar-fill.indet { width: 35% !important; animation: indet 1.1s ease-in-out infinite; }
+    @keyframes indet { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+
+    /* ── Résultat ────────────────────────────────────── */
+    .result { display: none; margin-top: 1.1rem; padding: 0.9rem 1rem; border-radius: 8px; font-size: 0.9rem; font-weight: 500; line-height: 1.4; }
+    .result.success { display: flex; gap: 0.6rem; background: var(--light); border: 1px solid #bfe3d6; color: var(--primary-dark); }
+    .result.error { display: flex; gap: 0.6rem; background: var(--error-bg); border: 1px solid #fca5a5; color: var(--error); }
+
+    /* ── Section résultats ───────────────────────────── */
+    #results { display: none; width: 100%; flex-direction: column; }
+    #results.visible { display: flex; }
+
+    /* KPI synthèse */
+    .summary-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: stretch; }
+    .kpi { flex: 1 1 240px; background: linear-gradient(135deg, var(--primary-dark), var(--primary)); color: var(--white); border-radius: 12px; padding: 1.25rem 1.4rem; }
+    .kpi-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85; }
+    .kpi-value { font-family: var(--font-heading); font-size: 1.9rem; font-weight: 700; margin-top: 0.3rem; }
+    .kpi-sub { font-size: 0.8rem; opacity: 0.8; margin-top: 0.2rem; }
+    .subtotals { flex: 1 1 240px; max-height: 160px; overflow-y: auto; border: 1px solid var(--gray-border); border-radius: 12px; padding: 0.5rem 0; }
+    .subtotals-title { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); padding: 0.3rem 1rem; }
+    .subtotals table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .subtotals td { padding: 0.3rem 1rem; }
+    .subtotals td:last-child { text-align: right; font-weight: 600; }
+
+    .toolbar { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 1.25rem 0 0.5rem; }
+    .toolbar label { font-size: 0.9rem; display: flex; align-items: center; gap: 0.45rem; cursor: pointer; }
+
+    /* Table éditable */
+    .table-scroll { overflow-x: auto; border: 1px solid var(--gray-border); border-radius: 10px; }
+    table.data { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    table.data thead th { background: var(--primary-dark); color: var(--white); font-family: var(--font-heading); font-weight: 600; font-size: 0.82rem; padding: 0.65rem 0.75rem; text-align: left; position: sticky; top: 0; }
+    table.data tbody td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--gray-border); }
+    table.data tbody tr.saisi { opacity: 0.5; }
+    table.data input[type="text"], table.data input[type="number"], table.data input[type="date"] { width: 100%; border: 1px solid transparent; background: transparent; padding: 0.35rem 0.4rem; border-radius: 6px; font-family: var(--font-body); font-size: 0.9rem; color: var(--primary-dark); }
+    table.data input:focus { outline: none; border-color: var(--accent); background: var(--white); }
+    table.data input[type="number"] { text-align: right; }
+    table.data td.col-saisi { text-align: center; width: 70px; }
+    table.data td.col-montant { width: 140px; }
+    .btn-del { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 4px; }
+    .btn-del:hover { color: var(--error); background: var(--error-bg); }
+
+    .chart-wrap { position: relative; height: 380px; margin-top: 0.5rem; }
+
+    .export-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+    .radio-group { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+    .radio-group label { font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+
+    .footer { margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-muted); text-align: center; opacity: 0.7; }
+
+    @media (max-width: 640px) {
+      .kpi-value { font-size: 1.5rem; }
+      table.data { font-size: 0.82rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="auth-loader">
+    <div class="spinner"></div>
+    <span>Vérification de la session…</span>
+  </div>
+
+  <nav class="topnav" id="topnav" style="display:none">
+    <div class="topnav-left">
+      <img src="/static/images/lcr-logo.png" alt="LCR">
+      <div>
+        <div class="topnav-tool-name">Synthèse LCR → Excel</div>
+        <div class="topnav-subtitle">MultiBrasServices · ZoomAli.io</div>
+      </div>
+    </div>
+    <div class="topnav-right">
+      <a class="back-link" id="back-link" href="#">← Retour aux outils</a>
+      <button class="btn-logout-nav" id="btn-logout-nav">Déconnexion</button>
+    </div>
+  </nav>
+
+  <div id="app">
+    <div class="header">
+      <h1>Synthèse des LCR <span>à Payer</span></h1>
+      <p>Chargez vos relevés LCR au format PDF pour générer une synthèse interactive et l'exporter en Excel.</p>
+    </div>
+
+    <div class="card card-upload">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".pdf" multiple>
+        <div class="dropzone-icon">📄</div>
+        <div class="dropzone-text">Déposez vos PDF ici</div>
+        <div class="dropzone-hint">ou cliquez pour sélectionner · un ou plusieurs PDF</div>
+      </div>
+
+      <div class="file-list" id="file-list"></div>
+
+      <button class="btn btn-primary" id="btn-parse" disabled>Analyser les relevés</button>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-label">
+          <span id="progress-text">Analyse en cours…</span>
+        </div>
+        <div class="progress-bar-track"><div class="progress-bar-fill indet" id="progress-fill"></div></div>
+      </div>
+
+      <div class="result" id="result"></div>
+    </div>
+
+    <!-- Résultats -->
+    <div id="results">
+      <div class="card">
+        <h2>📊 Synthèse du reste à payer</h2>
+        <div class="summary-row">
+          <div class="kpi">
+            <div class="kpi-label">Total général à payer</div>
+            <div class="kpi-value" id="kpi-total">0,00 €</div>
+            <div class="kpi-sub" id="kpi-count">0 opération</div>
+          </div>
+          <div class="subtotals">
+            <div class="subtotals-title">Sous-totaux par jour (&gt; 1 op.)</div>
+            <table><tbody id="subtotals-body"></tbody></table>
+          </div>
+        </div>
+        <div class="toolbar">
+          <label><input type="checkbox" id="hide-saisi"> Masquer les opérations déjà saisies (synthèse &amp; graphique)</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>✏️ Opérations extraites</h2>
+        <div class="table-scroll">
+          <table class="data">
+            <thead>
+              <tr>
+                <th class="col-saisi">Saisi ?</th>
+                <th>Date d'Échéance</th>
+                <th>Nom du Tireur</th>
+                <th>N° Opération</th>
+                <th class="col-montant">Montant (€)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-ghost" id="btn-add-row">+ Ajouter une ligne</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📈 Visualisation des échéances</h2>
+        <div class="toolbar">
+          <label><input type="checkbox" id="chart-line"> Afficher en courbe (au lieu de l'histogramme)</label>
+        </div>
+        <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2>📥 Exporter en Excel</h2>
+        <div class="export-row">
+          <div class="radio-group">
+            <label><input type="radio" name="export-scope" value="all" checked> Toutes les opérations</label>
+            <label><input type="radio" name="export-scope" value="unpaid"> Uniquement les non-saisies</label>
+          </div>
+          <button class="btn btn-primary" id="btn-export" style="width:auto;margin:0;">Télécharger en Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer" id="footer">MultiBrasServices · Synthèse LCR</div>
+  </div>
+
+  <div id="access-denied">
+    <div class="denied-icon">🔒</div>
+    <h2>Accès non autorisé</h2>
+    <p>Votre compte est bien connecté, mais il n'a pas accès à cet outil. Contactez votre administrateur pour obtenir l'autorisation.</p>
+    <a id="denied-link" href="#">← Retour aux outils</a>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="/config.js"></script>
+  <script>
+    (function () {
+      const ZM_PALETTE = ['#6495ED','#70AD47','#CD5C5C','#FFD700','#3ecf9f','#9D67E3','#FF8C00','#1E90FF','#8B4513','#95E1D3','#A8D8EA','#DDA0DD'];
+
+      const cfg               = window.LCR_CONFIG || {};
+      const SUPABASE_URL      = cfg.SUPABASE_URL || '';
+      const SUPABASE_ANON_KEY = cfg.SUPABASE_ANON_KEY || '';
+      const SERVICE_ID        = cfg.SERVICE_ID;
+      const VERSION           = cfg.VERSION || '';
+      const LOGIN_URL         = cfg.LOGIN_URL || 'https://saaas.zoomali.io';
+
+      const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+
+      const $loader  = document.getElementById('auth-loader');
+      const $app     = document.getElementById('app');
+      const $denied  = document.getElementById('access-denied');
+      const $footer  = document.getElementById('footer');
+      const $topnav  = document.getElementById('topnav');
+
+      document.getElementById('back-link').href = LOGIN_URL;
+      document.getElementById('denied-link').href = LOGIN_URL;
+      if (VERSION) $footer.textContent = 'MultiBrasServices · Synthèse LCR · Version ' + VERSION;
+
+      // ── SSO cookie storage (.zoomali.io) ──────────────────────────────
+      const COOKIE_DOMAIN  = '.zoomali.io';
+      const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+      const isSharedDomain = window.location.hostname.endsWith('.zoomali.io');
+      const cookieStorage  = {
+        getItem: function (key) {
+          var parts = document.cookie.split('; ');
+          for (var i = 0; i < parts.length; i++) {
+            var eq = parts[i].indexOf('=');
+            if (eq > 0 && parts[i].slice(0, eq) === key) return decodeURIComponent(parts[i].slice(eq + 1));
+          }
+          return null;
+        },
+        setItem: function (key, value) {
+          document.cookie = key + '=' + encodeURIComponent(value) + '; path=/; domain=' + COOKIE_DOMAIN + '; max-age=' + COOKIE_MAX_AGE + '; SameSite=Lax; Secure';
+        },
+        removeItem: function (key) {
+          document.cookie = key + '=; path=/; domain=' + COOKIE_DOMAIN + '; max-age=0; SameSite=Lax; Secure';
+        }
+      };
+      const sharedStorage = isSharedDomain ? cookieStorage : window.localStorage;
+
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        $loader.innerHTML = '<span style="color:#c62828">Configuration Supabase manquante.</span>';
+        return;
+      }
+
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, storage: sharedStorage }
+      });
+
+      let currentToken = null;
+
+      async function hasServiceAccess(session) {
+        try {
+          const { data } = await sb.from('user_services').select('service_id')
+            .eq('user_id', session.user.id).eq('service_id', SERVICE_ID).maybeSingle();
+          return !!data;
+        } catch (e) { return true; }   // fail-open UX — le backend tranche
+      }
+
+      sb.auth.getSession().then(async ({ data }) => {
+        if (!data.session) { window.location.href = LOGIN_URL; return; }
+        currentToken = data.session.access_token;
+        const allowed = await hasServiceAccess(data.session);
+        $loader.style.display = 'none';
+        if (allowed) { $topnav.style.display = 'flex'; $app.classList.add('visible'); }
+        else { $denied.classList.add('visible'); }
+      });
+
+      sb.auth.onAuthStateChange((_e, session) => {
+        if (session) currentToken = session.access_token;
+        else window.location.href = LOGIN_URL;
+      });
+
+      document.getElementById('btn-logout-nav').addEventListener('click', async () => {
+        await sb.auth.signOut();
+        window.location.href = LOGIN_URL;
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.location.href = LOGIN_URL; });
+
+      // ════════════════════════════════════════════════════════════════
+      //  ÉTAT & UI
+      // ════════════════════════════════════════════════════════════════
+      let rows = [];          // {echeance, echeance_display, tireur, operation, montant, saisi}
+      let chart = null;
+
+      const $dropzone = document.getElementById('dropzone');
+      const $input    = document.getElementById('file-input');
+      const $fileList = document.getElementById('file-list');
+      const $btnParse = document.getElementById('btn-parse');
+      const $progWrap = document.getElementById('progress-wrap');
+      const $progText = document.getElementById('progress-text');
+      const $result   = document.getElementById('result');
+      const $results  = document.getElementById('results');
+      const $tbody    = document.getElementById('table-body');
+      const $hideSaisi = document.getElementById('hide-saisi');
+      const $chartLine = document.getElementById('chart-line');
+
+      let selectedFiles = [];
+
+      function formatSize(b) {
+        if (b < 1024) return b + ' o';
+        if (b < 1048576) return (b / 1024).toFixed(0) + ' Ko';
+        return (b / 1048576).toFixed(1) + ' Mo';
+      }
+
+      function showResult(type, html) {
+        $result.className = 'result ' + type;
+        $result.innerHTML = '<span>' + (type === 'success' ? '✅' : '❌') + '</span><span>' + html + '</span>';
+      }
+
+      function renderFileList() {
+        $fileList.innerHTML = '';
+        selectedFiles.forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'file-row';
+          row.innerHTML = '<span>📋</span><span class="fname">' + f.name + '</span><span class="fsize">' + formatSize(f.size) + '</span>';
+          $fileList.appendChild(row);
+        });
+        $btnParse.disabled = selectedFiles.length === 0;
+      }
+
+      function onFilesChosen(fileList) {
+        const pdfs = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+        if (!pdfs.length) return;
+        selectedFiles = pdfs;
+        renderFileList();
+        $result.className = 'result';
+      }
+
+      $dropzone.addEventListener('dragover', (e) => { e.preventDefault(); $dropzone.classList.add('dragover'); });
+      $dropzone.addEventListener('dragleave', () => $dropzone.classList.remove('dragover'));
+      $dropzone.addEventListener('drop', (e) => { e.preventDefault(); $dropzone.classList.remove('dragover'); if (e.dataTransfer.files.length) onFilesChosen(e.dataTransfer.files); });
+      $input.addEventListener('change', () => { if ($input.files.length) onFilesChosen($input.files); });
+
+      // ── Analyse (POST /parse) ─────────────────────────────────────────
+      $btnParse.addEventListener('click', async () => {
+        if (!selectedFiles.length || !currentToken) return;
+        $btnParse.disabled = true;
+        $progWrap.classList.add('visible');
+        $progText.textContent = 'Analyse de ' + selectedFiles.length + ' fichier(s)…';
+        $result.className = 'result';
+
+        const form = new FormData();
+        selectedFiles.forEach(f => form.append('files', f));
+
+        try {
+          const resp = await fetch('/parse', { method: 'POST', headers: { 'Authorization': 'Bearer ' + currentToken }, body: form });
+          $progWrap.classList.remove('visible');
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({ detail: 'Erreur inconnue.' }));
+            showResult('error', body.detail || 'Erreur lors de l\'analyse.');
+            $btnParse.disabled = false;
+            return;
+          }
+          const data = await resp.json();
+          rows = data.rows.map(r => Object.assign({ saisi: false }, r));
+          showResult('success', '<strong>' + data.count + ' opération' + (data.count > 1 ? 's' : '') + '</strong> extraite' + (data.count > 1 ? 's' : '') + ' avec succès.');
+          $btnParse.disabled = false;
+          renderAll();
+          $results.classList.add('visible');
+          $results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (err) {
+          $progWrap.classList.remove('visible');
+          showResult('error', 'Impossible de contacter le serveur. Vérifiez votre connexion.');
+          $btnParse.disabled = false;
+        }
+      });
+
+      // ── Rendu tableau éditable ────────────────────────────────────────
+      function isoToDisplay(iso) {
+        const p = iso.split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+      }
+
+      function renderTable() {
+        $tbody.innerHTML = '';
+        rows.forEach((r, i) => {
+          const tr = document.createElement('tr');
+          if (r.saisi) tr.classList.add('saisi');
+          tr.innerHTML =
+            '<td class="col-saisi"><input type="checkbox" data-i="' + i + '" data-f="saisi"' + (r.saisi ? ' checked' : '') + '></td>' +
+            '<td><input type="date" data-i="' + i + '" data-f="echeance" value="' + r.echeance + '"></td>' +
+            '<td><input type="text" data-i="' + i + '" data-f="tireur" value="' + (r.tireur || '').replace(/"/g, '&quot;') + '"></td>' +
+            '<td><input type="text" data-i="' + i + '" data-f="operation" value="' + (r.operation || '').replace(/"/g, '&quot;') + '"></td>' +
+            '<td class="col-montant"><input type="number" step="0.01" data-i="' + i + '" data-f="montant" value="' + r.montant + '"></td>' +
+            '<td><button class="btn-del" data-del="' + i + '" title="Supprimer">✕</button></td>';
+          $tbody.appendChild(tr);
+        });
+      }
+
+      $tbody.addEventListener('input', (e) => {
+        const el = e.target; const i = el.dataset.i; const f = el.dataset.f;
+        if (i === undefined) return;
+        if (f === 'saisi') { rows[i].saisi = el.checked; rows[i].echeance_display = rows[i].echeance_display; }
+        else if (f === 'montant') rows[i].montant = parseFloat(el.value) || 0;
+        else if (f === 'echeance') { rows[i].echeance = el.value; rows[i].echeance_display = isoToDisplay(el.value); }
+        else rows[i][f] = el.value;
+        if (f === 'saisi') { e.target.closest('tr').classList.toggle('saisi', el.checked); }
+        renderSummary(); renderChart();
+      });
+
+      $tbody.addEventListener('click', (e) => {
+        const del = e.target.dataset.del;
+        if (del === undefined) return;
+        rows.splice(Number(del), 1);
+        renderAll();
+      });
+
+      document.getElementById('btn-add-row').addEventListener('click', () => {
+        const today = new Date().toISOString().slice(0, 10);
+        rows.push({ echeance: today, echeance_display: isoToDisplay(today), tireur: '', operation: '', montant: 0, saisi: false });
+        renderAll();
+      });
+
+      // ── Synthèse ──────────────────────────────────────────────────────
+      function visibleRows() { return $hideSaisi.checked ? rows.filter(r => !r.saisi) : rows; }
+
+      function renderSummary() {
+        const data = visibleRows();
+        const total = data.reduce((s, r) => s + (Number(r.montant) || 0), 0);
+        document.getElementById('kpi-total').textContent = eur.format(total);
+        document.getElementById('kpi-count').textContent = data.length + ' opération' + (data.length > 1 ? 's' : '') + ' non saisie' + (data.length > 1 ? 's' : '');
+
+        // Sous-totaux par jour (> 1 opération)
+        const byDay = {};
+        data.forEach(r => { byDay[r.echeance] = byDay[r.echeance] || { sum: 0, n: 0 }; byDay[r.echeance].sum += Number(r.montant) || 0; byDay[r.echeance].n++; });
+        const body = document.getElementById('subtotals-body');
+        body.innerHTML = '';
+        Object.keys(byDay).sort().filter(d => byDay[d].n > 1).forEach(d => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = '<td>' + isoToDisplay(d) + '</td><td>' + eur.format(byDay[d].sum) + '</td>';
+          body.appendChild(tr);
+        });
+        if (!body.children.length) body.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted);font-size:0.85rem;">Aucune journée avec plus d\'une opération.</td></tr>';
+      }
+
+      // ── Graphique (Chart.js, empilé par tireur) ───────────────────────
+      function renderChart() {
+        const data = visibleRows();
+        const dates = Array.from(new Set(data.map(r => r.echeance))).sort();
+        const tireurs = Array.from(new Set(data.map(r => r.tireur || '—')));
+        const datasets = tireurs.map((t, idx) => {
+          const color = ZM_PALETTE[idx % ZM_PALETTE.length];
+          return {
+            label: t,
+            data: dates.map(d => data.filter(r => r.echeance === d && (r.tireur || '—') === t).reduce((s, r) => s + (Number(r.montant) || 0), 0)),
+            backgroundColor: color, borderColor: color, fill: false, tension: 0.3
+          };
+        });
+        const labels = dates.map(isoToDisplay);
+        const isLine = $chartLine.checked;
+        if (chart) chart.destroy();
+        chart = new Chart(document.getElementById('chart'), {
+          type: isLine ? 'line' : 'bar',
+          data: { labels, datasets },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right' },
+              tooltip: { callbacks: { label: (c) => c.dataset.label + ' : ' + eur.format(c.parsed.y) } }
+            },
+            scales: {
+              x: { stacked: !isLine, title: { display: true, text: "Date d'Échéance" } },
+              y: { stacked: !isLine, title: { display: true, text: 'Montant Total (€)' }, ticks: { callback: (v) => eur.format(v) } }
+            }
+          }
+        });
+      }
+
+      function renderAll() { renderTable(); renderSummary(); renderChart(); }
+
+      $hideSaisi.addEventListener('change', () => { renderSummary(); renderChart(); });
+      $chartLine.addEventListener('change', renderChart);
+
+      // ── Export (POST /export) ─────────────────────────────────────────
+      document.getElementById('btn-export').addEventListener('click', async () => {
+        const scope = document.querySelector('input[name="export-scope"]:checked').value;
+        const toExport = scope === 'unpaid' ? rows.filter(r => !r.saisi) : rows;
+        if (!toExport.length) { showResult('error', 'Aucune donnée à exporter pour cette sélection.'); return; }
+        const filename = scope === 'unpaid' ? 'synthese_lcr_a_payer' : 'synthese_lcr_complet';
+        const $btn = document.getElementById('btn-export');
+        $btn.disabled = true; const old = $btn.textContent; $btn.textContent = 'Génération…';
+        try {
+          const resp = await fetch('/export', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + currentToken, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: toExport, filename })
+          });
+          if (!resp.ok) {
+            const body = await resp.json().catch(() => ({ detail: 'Erreur inconnue.' }));
+            showResult('error', body.detail || 'Erreur lors de l\'export.');
+            return;
+          }
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = filename + '.xlsx';
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          showResult('error', 'Impossible de contacter le serveur.');
+        } finally {
+          $btn.disabled = false; $btn.textContent = old;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
