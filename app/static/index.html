@@ -311,7 +311,8 @@
       const SUPABASE_ANON_KEY = cfg.SUPABASE_ANON_KEY || '';
       const SERVICE_ID        = cfg.SERVICE_ID;
       const VERSION           = cfg.VERSION || '';
-      const LOGIN_URL         = cfg.LOGIN_URL || 'https://saaas.zoomali.io';
+      const LOGIN_URL         = cfg.LOGIN_URL || 'https://lcr.zoomali.io/login.html';
+      const PORTAL_URL        = cfg.PORTAL_URL || 'https://saaas.zoomali.io';
 
       const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 
@@ -321,8 +322,8 @@
       const $footer  = document.getElementById('footer');
       const $topnav  = document.getElementById('topnav');
 
-      document.getElementById('back-link').href = LOGIN_URL;
-      document.getElementById('denied-link').href = LOGIN_URL;
+      document.getElementById('back-link').href = PORTAL_URL;
+      document.getElementById('denied-link').href = PORTAL_URL;
       if (VERSION) $footer.textContent = 'MultiBrasServices · Synthèse LCR · Version ' + VERSION;
 
       // ── SSO cookie storage (.zoomali.io) ──────────────────────────────
@@ -384,7 +385,7 @@
         await sb.auth.signOut();
         window.location.href = LOGIN_URL;
       });
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.location.href = LOGIN_URL; });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.location.href = PORTAL_URL; });
 
       // ════════════════════════════════════════════════════════════════
       //  ÉTAT & UI

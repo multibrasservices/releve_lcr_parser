@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion · Synthèse LCR · ZoomAli.io</title>
+  <link rel="icon" href="/static/images/lcr-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary-dark: #1b3a4b;
+      --primary:      #2e86ab;
+      --accent:       #3ecf9f;
+      --accent-hover: #34b88c;
+      --white:        #ffffff;
+      --gray-bg:      #eef2f7;
+      --gray-border:  #e2e8f0;
+      --text-muted:   #6b7280;
+      --error:        #c62828;
+      --error-bg:     #fdecea;
+      --font-heading: 'Montserrat', sans-serif;
+      --font-body:    'Source Sans 3', sans-serif;
+    }
+    body {
+      font-family: var(--font-body);
+      background: var(--gray-bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      color: var(--primary-dark);
+    }
+    .card {
+      width: 100%;
+      max-width: 400px;
+      padding: 2.25rem 2rem;
+      background: var(--white);
+      border-radius: 14px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.09);
+      position: relative;
+      overflow: hidden;
+    }
+    /* Filigrane logo LCR en arrière-plan */
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url('/static/images/lcr-logo.png');
+      background-size: 150%;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.05;
+      z-index: 0;
+    }
+    .header { text-align: center; margin-bottom: 1.75rem; position: relative; z-index: 1; }
+    .header img { height: 52px; margin-bottom: 0.85rem; }
+    .header h1 { font-family: var(--font-heading); font-size: 1.45rem; font-weight: 700; }
+    .header h1 span { color: var(--accent); }
+    .header .subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .divider { border: none; height: 2px; background: var(--accent); margin: 1.5rem 0; opacity: 0.5; position: relative; z-index: 1; }
+    form { position: relative; z-index: 1; }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; font-weight: 500; font-size: 0.9rem; color: var(--text-muted); }
+    .form-group input {
+      width: 100%; padding: 12px; font-size: 1rem;
+      border-radius: 8px; border: 1px solid var(--gray-border);
+      font-family: var(--font-body); transition: border-color 0.2s;
+    }
+    .form-group input:focus { outline: none; border-color: var(--accent); }
+    .btn-primary {
+      width: 100%; padding: 13px;
+      background: var(--primary-dark); color: var(--white);
+      border: none; border-radius: 8px;
+      font-family: var(--font-heading); font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .message { margin-bottom: 1rem; text-align: center; padding: 0.65rem; border-radius: 8px; font-size: 0.9rem; position: relative; z-index: 1; display: none; }
+    .message.error { display: block; color: var(--error); background: var(--error-bg); border: 1px solid #f5b5b5; }
+    .footer-line { margin-top: 1.5rem; text-align: center; font-size: 0.78rem; color: var(--text-muted); position: relative; z-index: 1; }
+    .footer-line a { color: var(--primary); text-decoration: none; }
+    .footer-line a:hover { text-decoration: underline; }
+    #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--gray-bg); z-index: 20; color: var(--text-muted); font-size: 0.9rem; }
+    .spinner { width: 28px; height: 28px; border: 3px solid var(--gray-border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 0.6rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <div id="boot"><span class="spinner"></span> Vérification de la session…</div>
+
+  <div class="card">
+    <div class="header">
+      <img src="/static/images/lcr-logo.png" alt="LCR">
+      <h1>Synthèse <span>LCR</span></h1>
+      <div class="subtitle">MultiBrasServices · ZoomAli.io</div>
+    </div>
+    <hr class="divider">
+
+    <div class="message" id="msg"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="email">Adresse e-mail</label>
+        <input type="email" id="email" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn-primary" id="btn-login">Se connecter</button>
+    </form>
+
+    <div class="footer-line" id="footer">
+      <a id="portal-link" href="#">← Retour au portail</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="/config.js"></script>
+  <script>
+    (function () {
+      const cfg               = window.LCR_CONFIG || {};
+      const SUPABASE_URL      = cfg.SUPABASE_URL || '';
+      const SUPABASE_ANON_KEY = cfg.SUPABASE_ANON_KEY || '';
+      const VERSION           = cfg.VERSION || '';
+      const PORTAL_URL        = cfg.PORTAL_URL || 'https://saaas.zoomali.io';
+      const APP_URL           = '/';   // redirection après connexion
+
+      const $boot   = document.getElementById('boot');
+      const $msg    = document.getElementById('msg');
+      const $form   = document.getElementById('login-form');
+      const $btn    = document.getElementById('btn-login');
+      const $footer = document.getElementById('footer');
+
+      document.getElementById('portal-link').href = PORTAL_URL;
+      if (VERSION) $footer.insertAdjacentHTML('beforeend', '<div style="margin-top:0.5rem;opacity:0.8;">Version ' + VERSION + '</div>');
+
+      function showError(text) { $msg.className = 'message error'; $msg.textContent = text; }
+
+      // ── SSO cookie storage (.zoomali.io) — identique à l'app ───────────
+      const COOKIE_DOMAIN  = '.zoomali.io';
+      const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+      const isSharedDomain = window.location.hostname.endsWith('.zoomali.io');
+      const cookieStorage  = {
+        getItem: function (key) {
+          var parts = document.cookie.split('; ');
+          for (var i = 0; i < parts.length; i++) {
+            var eq = parts[i].indexOf('=');
+            if (eq > 0 && parts[i].slice(0, eq) === key) return decodeURIComponent(parts[i].slice(eq + 1));
+          }
+          return null;
+        },
+        setItem: function (key, value) {
+          document.cookie = key + '=' + encodeURIComponent(value) + '; path=/; domain=' + COOKIE_DOMAIN + '; max-age=' + COOKIE_MAX_AGE + '; SameSite=Lax; Secure';
+        },
+        removeItem: function (key) {
+          document.cookie = key + '=; path=/; domain=' + COOKIE_DOMAIN + '; max-age=0; SameSite=Lax; Secure';
+        }
+      };
+      const sharedStorage = isSharedDomain ? cookieStorage : window.localStorage;
+
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        $boot.innerHTML = '<span style="color:#c62828">Configuration Supabase manquante.</span>';
+        return;
+      }
+
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, storage: sharedStorage }
+      });
+
+      // SSO : si une session existe déjà (connexion sur un autre service), aller direct à l'app.
+      sb.auth.getSession().then(({ data }) => {
+        if (data.session) { window.location.href = APP_URL; return; }
+        $boot.style.display = 'none';
+      });
+
+      $form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        $msg.className = 'message';
+        $btn.disabled = true; $btn.textContent = 'Connexion…';
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        try {
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) {
+            showError(error.message === 'Invalid login credentials' ? 'E-mail ou mot de passe incorrect.' : error.message);
+            $btn.disabled = false; $btn.textContent = 'Se connecter';
+            return;
+          }
+          window.location.href = APP_URL;
+        } catch (err) {
+          showError('Impossible de contacter le serveur. Réessayez.');
+          $btn.disabled = false; $btn.textContent = 'Se connecter';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

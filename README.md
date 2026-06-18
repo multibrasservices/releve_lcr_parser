@@ -12,25 +12,29 @@ Remplace l'ancienne app Streamlit. Architecture identique à `rm-expert-journal-
 
 ```
 app/
-├── main.py       FastAPI : GET / · GET /config.js · POST /parse · POST /export
+├── main.py       FastAPI : GET / · /login.html · /config.js · POST /parse · /export
 ├── parser.py     Extraction déterministe des relevés LCR (pdfplumber)
 ├── exporter.py   Génération du classeur Excel (pandas + XlsxWriter)
 └── static/
     ├── index.html  SPA vanilla (Supabase JS + Chart.js via CDN)
+    ├── login.html  Page de login locale brandée (filigrane logo)
     └── images/     logo
 ```
 
-| Méthode | Route        | Auth            | Rôle                                            |
-|---------|--------------|-----------------|-------------------------------------------------|
-| GET     | `/`          | non             | Page (HTML)                                     |
-| GET     | `/config.js` | non             | Injecte la config runtime (`window.LCR_CONFIG`) |
-| POST    | `/parse`     | **JWT + accès** | PDF(s) → JSON des opérations extraites          |
-| POST    | `/export`    | **JWT + accès** | JSON (lignes éditées) → fichier `.xlsx`         |
+| Méthode | Route         | Auth            | Rôle                                            |
+|---------|---------------|-----------------|-------------------------------------------------|
+| GET     | `/`           | non             | Application (HTML)                              |
+| GET     | `/login.html` | non             | Page de login locale brandée                    |
+| GET     | `/config.js`  | non             | Injecte la config runtime (`window.LCR_CONFIG`) |
+| POST    | `/parse`      | **JWT + accès** | PDF(s) → JSON des opérations extraites          |
+| POST    | `/export`     | **JWT + accès** | JSON (lignes éditées) → fichier `.xlsx`         |
 
 ## Contrôle d'accès (deux niveaux)
 
-- **Front (UX)** : cookie SSO `.zoomali.io`, redirection vers `LOGIN_URL` si pas
-  de session, overlay « accès non autorisé » si pas de ligne `user_services`.
+- **Front (UX)** : cookie SSO `.zoomali.io`, redirection vers `LOGIN_URL` (page de
+  login locale brandée) si pas de session, overlay « accès non autorisé » si pas
+  de ligne `user_services`. La page `/login.html` redirige seule vers l'app si une
+  session SSO existe déjà (connexion sur un autre service de l'écosystème).
 - **Back (barrière réelle)** : `_require_auth` valide le JWT via
   `{SUPABASE_URL}/auth/v1/user`, puis exige une ligne
   `user_services(user_id, SERVICE_ID)` → `401` / `403` sinon.
@@ -61,7 +65,8 @@ Variables d'environnement à configurer dans Coolify :
 | `SUPABASE_URL`      | partagée (équipe) | `https://…`                          |
 | `SUPABASE_ANON_KEY` | partagée (équipe) | `eyJ…`                               |
 | `SERVICE_ID`        | locale            | `18`                                 |
-| `LOGIN_URL`         | locale            | `https://saaas.zoomali.io`           |
+| `LOGIN_URL`         | locale            | `https://lcr.zoomali.io/login.html`  |
+| `PORTAL_URL`        | locale            | `https://saaas.zoomali.io`           |
 
 ## Format source
 

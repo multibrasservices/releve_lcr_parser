@@ -16,8 +16,10 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 # service_id de cet outil dans la table `services` (verrou d'accès user_services).
 SERVICE_ID = int(os.environ.get("SERVICE_ID", "18"))
-# Page de login du portail vers laquelle rediriger une session absente/expirée.
-LOGIN_URL = os.environ.get("LOGIN_URL", "https://saaas.zoomali.io")
+# Page de login LOCALE brandée vers laquelle rediriger une session absente/expirée.
+LOGIN_URL = os.environ.get("LOGIN_URL", "https://lcr.zoomali.io/login.html")
+# Portail de l'écosystème (« Retour aux outils »).
+PORTAL_URL = os.environ.get("PORTAL_URL", "https://saaas.zoomali.io")
 
 app = FastAPI(title="Synthèse LCR → Excel", version=APP_VERSION, docs_url=None, redoc_url=None)
 
@@ -30,6 +32,12 @@ async def index():
     return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
 
 
+@app.get("/login.html", response_class=HTMLResponse)
+async def login():
+    """Page de login locale brandée (règle 18.1 : chaque sous-domaine a SA page /login)."""
+    return (STATIC_DIR / "login.html").read_text(encoding="utf-8")
+
+
 @app.get("/config.js")
 async def config_js():
     """Config runtime injectée depuis les vars d'env Coolify."""
@@ -39,6 +47,7 @@ async def config_js():
         f' SUPABASE_ANON_KEY: "{SUPABASE_ANON_KEY}",'
         f" SERVICE_ID: {SERVICE_ID},"
         f' LOGIN_URL: "{LOGIN_URL}",'
+        f' PORTAL_URL: "{PORTAL_URL}",'
         f' VERSION: "{APP_VERSION}"'
         f" }};"
     )
