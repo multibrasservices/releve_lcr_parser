@@ -65,8 +65,10 @@ Variables d'environnement à configurer dans Coolify :
 | `SUPABASE_URL`      | partagée (équipe) | `https://…`                          |
 | `SUPABASE_ANON_KEY` | partagée (équipe) | `eyJ…`                               |
 | `SERVICE_ID`        | locale            | `18`                                 |
-| `LOGIN_URL`         | locale            | `https://lcr.zoomali.io/login.html`  |
-| `PORTAL_URL`        | locale            | `https://saaas.zoomali.io`           |
+
+> La page de login est servie localement (`/login.html`, redirection relative) et
+> l'URL du portail (`https://saaas.zoomali.io`) est une constante du code : aucune
+> variable d'environnement de domaine à configurer.
 
 ## Format source
 

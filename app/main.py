@@ -16,10 +16,9 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 # service_id de cet outil dans la table `services` (verrou d'accès user_services).
 SERVICE_ID = int(os.environ.get("SERVICE_ID", "18"))
-# Page de login LOCALE brandée vers laquelle rediriger une session absente/expirée.
-LOGIN_URL = os.environ.get("LOGIN_URL", "https://lcr.zoomali.io/login.html")
-# Portail de l'écosystème (« Retour aux outils »).
-PORTAL_URL = os.environ.get("PORTAL_URL", "https://saaas.zoomali.io")
+# Portail de l'écosystème (« Retour aux outils ») — URL stable, pas un paramètre
+# d'environnement. La page de login est servie localement (/login.html, relatif).
+PORTAL_URL = "https://saaas.zoomali.io"
 
 app = FastAPI(title="Synthèse LCR → Excel", version=APP_VERSION, docs_url=None, redoc_url=None)
 
@@ -46,7 +45,6 @@ async def config_js():
         f' SUPABASE_URL: "{SUPABASE_URL}",'
         f' SUPABASE_ANON_KEY: "{SUPABASE_ANON_KEY}",'
         f" SERVICE_ID: {SERVICE_ID},"
-        f' LOGIN_URL: "{LOGIN_URL}",'
         f' PORTAL_URL: "{PORTAL_URL}",'
         f' VERSION: "{APP_VERSION}"'
         f" }};"
