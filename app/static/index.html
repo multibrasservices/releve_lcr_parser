@@ -280,12 +280,38 @@
       <div class="card">
         <h2>📥 Exporter en Excel</h2>
         <div class="export-row">
-          <div class="radio-group">
-            <label><input type="radio" name="export-scope" value="all" checked> Toutes les opérations</label>
-            <label><input type="radio" name="export-scope" value="unpaid"> Uniquement les non-saisies</label>
-          </div>
           <button class="btn btn-primary" id="btn-export" style="width:auto;margin:0;">Télécharger en Excel</button>
         </div>
+      </div>
+
+      <div class="card">
+        <h2>🧾 Écriture comptable (GADM)</h2>
+        <div class="export-row" style="margin-bottom:1rem;">
+          <label>Société
+            <select id="societe" style="margin-left:.5rem;padding:8px;border:1px solid var(--gray-border);border-radius:8px;"></select>
+          </label>
+          <span id="societe-param" class="muted" style="font-size:.88rem;"></span>
+        </div>
+
+        <div id="tireurs-manquants" style="display:none;margin-bottom:1rem;">
+          <p style="margin-bottom:.5rem;">Comptes fournisseurs à renseigner (une fois, puis mémorisés) :</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead><tr><th>Nom du Tireur</th><th style="width:180px;">Compte 401</th></tr></thead>
+              <tbody id="tireurs-body"></tbody>
+            </table>
+          </div>
+          <div class="toolbar"><button class="btn btn-ghost" id="btn-save-tireurs">Enregistrer les comptes</button></div>
+        </div>
+
+        <div class="export-row">
+          <button class="btn btn-primary" id="btn-gadm-xlsx" style="width:auto;margin:0;">Excel 11 colonnes</button>
+          <a id="btn-gadm-envoi" class="btn btn-ghost" style="display:none;align-items:center;gap:.5rem;text-decoration:none;"
+             target="_blank" rel="noopener">
+            <img src="/static/images/gadm.png" alt="" style="height:22px;border-radius:3px;"><span>Envoyer vers GADM</span>
+          </a>
+        </div>
+        <div id="gadm-info" class="muted" style="font-size:.88rem;margin-top:.6rem;"></div>
       </div>
     </div>
 
@@ -576,17 +602,17 @@
         });
       }
 
-      function renderAll() { renderTable(); renderSummary(); renderChart(); }
+      function renderAll() { renderTable(); renderSummary(); renderChart();
+        if (window.majEcritureGadm) window.majEcritureGadm(); }
 
       $hideSaisi.addEventListener('change', () => { renderSummary(); renderChart(); });
       $chartLine.addEventListener('change', renderChart);
 
       // ── Export (POST /export) ─────────────────────────────────────────
       document.getElementById('btn-export').addEventListener('click', async () => {
-        const scope = document.querySelector('input[name="export-scope"]:checked').value;
-        const toExport = scope === 'unpaid' ? rows.filter(r => !r.saisi) : rows;
-        if (!toExport.length) { showResult('error', 'Aucune donnée à exporter pour cette sélection.'); return; }
-        const filename = scope === 'unpaid' ? 'synthese_lcr_a_payer' : 'synthese_lcr_complet';
+        const toExport = rows;
+        if (!toExport.length) { showResult('error', 'Aucune donnée à exporter.'); return; }
+        const filename = 'synthese_lcr_complet';
         const $btn = document.getElementById('btn-export');
         $btn.disabled = true; const old = $btn.textContent; $btn.textContent = 'Génération…';
         try {
@@ -612,6 +638,112 @@
           $btn.disabled = false; $btn.textContent = old;
         }
       });
+
+      // ── Écriture GADM : 1 relevé = 1 écriture (N lignes 401 + 1 ligne 512) ──
+      const $societe   = document.getElementById('societe');
+      const $param     = document.getElementById('societe-param');
+      const $manquants = document.getElementById('tireurs-manquants');
+      const $tireursBody = document.getElementById('tireurs-body');
+      const $envoi     = document.getElementById('btn-gadm-envoi');
+      const $infoGadm  = document.getElementById('gadm-info');
+      let societes = [], comptes = {};
+
+      const normTireur = (n) => String(n || '').trim().replace(/\s+/g, ' ').toUpperCase();
+      const societeCourante = () => societes.find(s => s.id === $societe.value);
+
+      async function chargerSocietes() {
+        const { data, error } = await sb.from('lcr_societes').select('*').eq('actif', true).order('nom');
+        if (error || !data) { $infoGadm.textContent = 'Sociétés indisponibles.'; return; }
+        societes = data;
+        $societe.innerHTML = data.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+        await chargerTireurs();
+      }
+
+      async function chargerTireurs() {
+        const societe = societeCourante();
+        if (!societe) return;
+        $param.textContent = `banque ${societe.pcg_512} · journal ${societe.code_journal} · ${societe.nature}/${societe.reglement}`;
+        const { data } = await sb.from('lcr_tireurs').select('tireur,pcg_401').eq('societe_id', societe.id);
+        comptes = {};
+        (data || []).forEach(t => { comptes[t.tireur] = t.pcg_401; });
+        majManquants();
+      }
+
+      function majManquants() {
+        const vus = [...new Set(rows.map(r => normTireur(r.tireur)))].filter(Boolean);
+        const absents = vus.filter(t => !comptes[t]);
+        $manquants.style.display = absents.length ? '' : 'none';
+        $tireursBody.innerHTML = absents.map(t =>
+          `<tr><td>${t}</td><td><input data-tireur="${t}" maxlength="8" placeholder="401....."
+             style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td></tr>`
+        ).join('');
+        $envoi.style.display = 'none';
+        $infoGadm.textContent = absents.length
+          ? `${absents.length} tireur(s) sans compte : l'écriture ne peut pas être générée.` : '';
+        if (!absents.length && rows.length) preparerEnvoi();
+      }
+
+      document.getElementById('btn-save-tireurs').addEventListener('click', async () => {
+        const societe = societeCourante();
+        const saisies = [...$tireursBody.querySelectorAll('input')]
+          .map(i => ({ societe_id: societe.id, tireur: i.dataset.tireur, pcg_401: i.value.trim() }))
+          .filter(t => t.pcg_401);
+        if (!saisies.length) { showResult('error', 'Aucun compte saisi.'); return; }
+        const { error } = await sb.from('lcr_tireurs').upsert(saisies, { onConflict: 'societe_id,tireur' });
+        if (error) { showResult('error', 'Enregistrement impossible : ' + error.message); return; }
+        await chargerTireurs();
+      });
+
+      $societe.addEventListener('change', chargerTireurs);
+
+      async function appelerGadm(chemin) {
+        const societe = societeCourante();
+        if (!societe) { showResult('error', 'Choisir une société.'); return null; }
+        if (!rows.length) { showResult('error', 'Aucune opération à comptabiliser.'); return null; }
+        const resp = await fetch(chemin, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + currentToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rows, societe, comptes, filename: 'GADM_LCR_' + societe.nom })
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          const manquants = body.detail && body.detail.tireurs_manquants;
+          showResult('error', manquants ? 'Tireurs sans compte : ' + manquants.join(', ')
+                                        : (body.detail || 'Erreur de génération.'));
+          if (manquants) majManquants();
+          return null;
+        }
+        return resp;
+      }
+
+      document.getElementById('btn-gadm-xlsx').addEventListener('click', async () => {
+        const resp = await appelerGadm('/gadm/xlsx');
+        if (!resp) return;
+        const url = URL.createObjectURL(await resp.blob());
+        const a = document.createElement('a');
+        a.href = url; a.download = 'GADM_LCR_' + societeCourante().nom + '.xlsx';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        await preparerEnvoi();
+      });
+
+      // Lien vers gadm.zoomali.io : le journal voyage dans le FRAGMENT d'URL,
+      // jamais transmis au serveur (contrat : repo gadm, envoyer-un-journal-a-gadm.md).
+      async function preparerEnvoi() {
+        const resp = await appelerGadm('/gadm');
+        if (!resp) return;
+        const { tsv, lignes } = await resp.json();
+        const octets = new TextEncoder().encode(tsv);
+        let binaire = ''; octets.forEach(o => binaire += String.fromCharCode(o));
+        const b64 = btoa(binaire).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const nom = 'GADM_LCR_' + societeCourante().nom;
+        $envoi.href = `https://gadm.zoomali.io/#j=${b64}&n=${encodeURIComponent(nom)}`;
+        $envoi.style.display = 'inline-flex';
+        $infoGadm.textContent = `${lignes.length} lignes · équilibrée.`;
+      }
+
+      window.majEcritureGadm = () => { if (societes.length) { majManquants(); } };
+      chargerSocietes();
     })();
   </script>
 </body>

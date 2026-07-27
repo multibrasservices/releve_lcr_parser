@@ -102,3 +102,18 @@ def build_xlsx(rows: list[dict]) -> bytes:
             main_worksheet.insert_chart("J2", chart)
 
     return output.getvalue()
+
+
+def build_xlsx_gadm(lignes: list[dict]) -> bytes:
+    """Écriture JoGADM (11 colonnes) → classeur Excel, collable dans la GADM."""
+    from app.ecriture import COLONNES_JOGADM
+
+    df = pd.DataFrame(lignes, columns=COLONNES_JOGADM)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, sheet_name="JoGADM", index=False)
+        feuille = writer.sheets["JoGADM"]
+        for i, col in enumerate(df.columns):
+            largeur = max(len(col), int(df[col].astype(str).map(len).max() or 0)) + 2
+            feuille.set_column(i, i, min(largeur, 24))
+    return output.getvalue()

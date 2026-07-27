@@ -7,7 +7,8 @@ from fastapi import Body, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from app.exporter import build_xlsx
+from app.ecriture import EcritureIncomplete, construire_ecriture, tsv_jogadm
+from app.exporter import build_xlsx, build_xlsx_gadm
 from app.parser import parse_lcr
 
 APP_VERSION = "2026.06.18-1"
@@ -125,6 +126,57 @@ async def parse(
 
     all_rows.sort(key=lambda r: r["echeance"])
     return {"rows": all_rows, "count": len(all_rows)}
+
+
+@app.post("/gadm")
+async def gadm(
+    payload: dict = Body(...),
+    authorization: str = Header(default=""),
+):
+    """
+    Opérations + société + comptes des tireurs → écriture JoGADM (1 PDF = 1 écriture).
+    Renvoie 400 avec la liste des tireurs à paramétrer si le mapping est incomplet.
+    """
+    await _require_auth(authorization)
+    try:
+        lignes = construire_ecriture(
+            payload.get("rows") or [],
+            payload.get("societe") or {},
+            payload.get("comptes") or {},
+            payload.get("date_piece"),
+        )
+    except EcritureIncomplete as e:
+        raise HTTPException(status_code=400, detail={"tireurs_manquants": e.tireurs})
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"lignes": lignes, "tsv": tsv_jogadm(lignes)}
+
+
+@app.post("/gadm/xlsx")
+async def gadm_xlsx(
+    payload: dict = Body(...),
+    authorization: str = Header(default=""),
+):
+    """Même écriture, livrée en classeur Excel 11 colonnes (collable dans la GADM)."""
+    await _require_auth(authorization)
+    try:
+        lignes = construire_ecriture(
+            payload.get("rows") or [],
+            payload.get("societe") or {},
+            payload.get("comptes") or {},
+            payload.get("date_piece"),
+        )
+    except EcritureIncomplete as e:
+        raise HTTPException(status_code=400, detail={"tireurs_manquants": e.tireurs})
+    except (ValueError, KeyError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    nom = urllib.parse.quote(f"{payload.get('filename') or 'GADM_LCR'}.xlsx")
+    return Response(
+        content=build_xlsx_gadm(lignes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{nom}"},
+    )
 
 
 @app.post("/export")
