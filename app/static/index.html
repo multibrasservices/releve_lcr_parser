@@ -307,14 +307,25 @@
         </div>
 
         <div id="tireurs-manquants" style="display:none;margin-bottom:1rem;">
-          <p style="margin-bottom:.5rem;">Comptes fournisseurs à renseigner (une fois, puis mémorisés) :</p>
+          <p style="margin-bottom:.5rem;">Comptes fournisseurs (401) — modifiables et supprimables :</p>
           <div class="table-scroll">
             <table class="data">
-              <thead><tr><th>Nom du Tireur</th><th style="width:180px;">Compte 401</th></tr></thead>
+              <thead><tr><th>Nom du Tireur</th><th style="width:180px;">Compte 401</th><th></th></tr></thead>
               <tbody id="tireurs-body"></tbody>
             </table>
           </div>
           <div class="toolbar"><button class="btn btn-ghost" id="btn-save-tireurs">Enregistrer les comptes</button></div>
+        </div>
+
+        <div class="table-scroll" id="apercu-wrap" style="display:none;margin-bottom:1rem;">
+          <table class="data">
+            <thead><tr>
+              <th>Date</th><th>Jo</th><th>Nat.</th><th>Pcg</th><th>Pièce</th>
+              <th>Libéllé1</th><th>Libéllé2</th><th class="col-montant">D</th>
+              <th class="col-montant">C</th><th>Règl.</th><th>Échéance</th>
+            </tr></thead>
+            <tbody id="apercu-body"></tbody>
+          </table>
         </div>
 
         <div class="export-row">
@@ -503,6 +514,7 @@
           }
           const data = await resp.json();
           rows = data.rows.map(r => Object.assign({ saisi: false }, r));
+          tireDetecte = data.tire || null;
           showResult('success', '<strong>' + data.count + ' opération' + (data.count > 1 ? 's' : '') + '</strong> extraite' + (data.count > 1 ? 's' : '') + ' avec succès.');
           $btnParse.disabled = false;
           renderAll();
@@ -659,7 +671,7 @@
       const $tireursBody = document.getElementById('tireurs-body');
       const $envoi     = document.getElementById('btn-gadm-envoi');
       const $infoGadm  = document.getElementById('gadm-info');
-      let societes = [], comptes = {};
+      let societes = [], comptes = {}, tireDetecte = null;
 
       const normTireur = (n) => String(n || '').trim().replace(/\s+/g, ' ').toUpperCase();
       const societeCourante = () => societes.find(s => s.id === $societe.value);
@@ -685,15 +697,36 @@
       function majManquants() {
         const vus = [...new Set(rows.map(r => normTireur(r.tireur)))].filter(Boolean);
         const absents = vus.filter(t => !comptes[t]);
-        $manquants.style.display = absents.length ? '' : 'none';
-        $tireursBody.innerHTML = absents.map(t =>
-          `<tr><td>${t}</td><td><input data-tireur="${t}" maxlength="8" placeholder="401....."
-             style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td></tr>`
-        ).join('');
+        // Table unique : les tireurs du relevé d'abord, puis le reste du paramétrage.
+        // Tout est éditable et supprimable (CRUD), comme sur open-paye-gadm.
+        const tous = [...vus, ...Object.keys(comptes).filter(t => !vus.includes(t))];
+        $manquants.style.display = tous.length ? '' : 'none';
+        $tireursBody.innerHTML = tous.map(t => {
+          const compte = comptes[t] || '';
+          const dansReleve = vus.includes(t);
+          return `<tr${compte ? '' : ' style="background:var(--error-bg);"'}>
+            <td>${t}${dansReleve ? '' : ' <span class="muted" style="font-size:.8rem;">(hors relevé)</span>'}</td>
+            <td><input data-tireur="${t}" maxlength="8" value="${compte}" placeholder="401....."
+                 style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td>
+            <td style="width:40px;text-align:center;">${compte
+              ? `<button class="btn-del" data-suppr="${t}" title="Supprimer">🗑</button>` : ''}</td>
+          </tr>`;
+        }).join('');
+        $tireursBody.querySelectorAll('[data-suppr]').forEach(b =>
+          b.addEventListener('click', () => supprimerTireur(b.dataset.suppr)));
         $envoi.style.display = 'none';
+        if (absents.length) renderApercu([]);
         $infoGadm.textContent = absents.length
           ? `${absents.length} tireur(s) sans compte : l'écriture ne peut pas être générée.` : '';
         if (!absents.length && rows.length) preparerEnvoi();
+      }
+
+      async function supprimerTireur(tireur) {
+        const societe = societeCourante();
+        const { error } = await sb.from('lcr_tireurs').delete()
+          .eq('societe_id', societe.id).eq('tireur', tireur);
+        if (error) { showResult('error', 'Suppression impossible : ' + error.message); return; }
+        await chargerTireurs();
       }
 
       document.getElementById('btn-save-tireurs').addEventListener('click', async () => {
@@ -752,7 +785,9 @@
         const nom = 'GADM_LCR_' + societeCourante().nom;
         $envoi.href = `https://gadm.zoomali.io/#j=${b64}&n=${encodeURIComponent(nom)}`;
         $envoi.style.display = 'inline-flex';
-        $infoGadm.textContent = `${lignes.length} lignes · équilibrée.`;
+        renderApercu(lignes);
+        const totalC = lignes.reduce((s, l) => s + (parseFloat(l.C) || 0), 0);
+        $infoGadm.textContent = `${lignes.length} lignes · total ${totalC.toFixed(2)} € · équilibrée.`;
       }
 
       // ── Paramètres société (super_admin / user_admin uniquement) ──────────
@@ -809,7 +844,28 @@
         await chargerSocietes();
       });
 
-      window.majEcritureGadm = () => { if (societes.length) { majManquants(); } };
+      const COLS_GADM = ['Date','Jo','Nature','Pcg','Pièce','Libéllé1','Libéllé2','D','C','Règlement','Echeance'];
+      function renderApercu(lignes) {
+        const $wrap = document.getElementById('apercu-wrap');
+        const $body = document.getElementById('apercu-body');
+        $body.innerHTML = lignes.map(l =>
+          '<tr>' + COLS_GADM.map(c => `<td>${l[c] ?? ''}</td>`).join('') + '</tr>').join('');
+        $wrap.style.display = lignes.length ? '' : 'none';
+      }
+
+      // Le relevé porte « Tiré : LAMPROIE SAS » → on présélectionne la société.
+      function selectionnerSocieteDetectee() {
+        if (!tireDetecte || !societes.length) return;
+        const cible = tireDetecte.toUpperCase();
+        const trouvee = societes.find(s => cible.includes(s.nom.toUpperCase()));
+        if (trouvee) $societe.value = trouvee.id;
+      }
+
+      window.majEcritureGadm = () => {
+        if (!societes.length) return;
+        selectionnerSocieteDetectee();
+        chargerTireurs();
+      };
       chargerSocietes().then(async () => {
         if (await estAdmin()) document.getElementById('btn-params').style.display = '';
       });

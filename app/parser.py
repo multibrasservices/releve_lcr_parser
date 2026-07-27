@@ -63,3 +63,21 @@ def parse_lcr(pdf_bytes: bytes) -> list[dict]:
 
     rows.sort(key=lambda r: r["echeance"])
     return rows
+
+
+def detecter_tire(pdf_bytes: bytes) -> str | None:
+    """Nom du tiré (la société) imprimé sur le relevé — « Tiré : LAMPROIE SAS ».
+
+    Sert à présélectionner la bonne société : le nom est sur la pièce, inutile de
+    le demander. Retourne None si le motif n'est pas trouvé (choix manuel).
+    """
+    import re
+
+    import pdfplumber
+
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        if not pdf.pages:
+            return None
+        texte = pdf.pages[0].extract_text() or ""
+    trouve = re.search(r"Tir[ée]\s*:?\s*(.+)", texte, re.IGNORECASE)
+    return " ".join(trouve.group(1).split()) if trouve else None

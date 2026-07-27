@@ -9,9 +9,9 @@ from fastapi.staticfiles import StaticFiles
 
 from app.ecriture import EcritureIncomplete, construire_ecriture, tsv_jogadm
 from app.exporter import build_xlsx, build_xlsx_gadm
-from app.parser import parse_lcr
+from app.parser import detecter_tire, parse_lcr
 
-APP_VERSION = "27.07.26-3"
+APP_VERSION = "27.07.26-4"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -107,6 +107,7 @@ async def parse(
     await _require_auth(authorization)
 
     all_rows: list[dict] = []
+    tire: str | None = None
     for file in files:
         if not file.filename or not file.filename.lower().endswith(".pdf"):
             raise HTTPException(status_code=400, detail=f"« {file.filename} » n'est pas un PDF.")
@@ -115,6 +116,7 @@ async def parse(
             raise HTTPException(status_code=400, detail=f"« {file.filename} » dépasse 20 Mo.")
         try:
             all_rows.extend(parse_lcr(pdf_bytes))
+            tire = tire or detecter_tire(pdf_bytes)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erreur de lecture de « {file.filename} » : {e}")
 
@@ -125,7 +127,8 @@ async def parse(
         )
 
     all_rows.sort(key=lambda r: r["echeance"])
-    return {"rows": all_rows, "count": len(all_rows)}
+    # `tire` = société imprimée sur le relevé, pour présélectionner le paramétrage
+    return {"rows": all_rows, "count": len(all_rows), "tire": tire}
 
 
 @app.post("/gadm")
