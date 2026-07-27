@@ -11,7 +11,7 @@ from app.ecriture import EcritureIncomplete, construire_ecriture, tsv_jogadm
 from app.exporter import build_xlsx, build_xlsx_gadm
 from app.parser import detecter_tire, parse_lcr
 
-APP_VERSION = "27.07.26-5"
+APP_VERSION = "27.07.26-6"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -115,7 +115,11 @@ async def parse(
         if len(pdf_bytes) > 20 * 1024 * 1024:
             raise HTTPException(status_code=400, detail=f"« {file.filename} » dépasse 20 Mo.")
         try:
-            all_rows.extend(parse_lcr(pdf_bytes))
+            # `releve` = fichier d'origine : 1 relevé = 1 écriture (donc 1 ligne 512)
+            lignes_pdf = parse_lcr(pdf_bytes)
+            for ligne in lignes_pdf:
+                ligne["releve"] = file.filename
+            all_rows.extend(lignes_pdf)
             tire = tire or detecter_tire(pdf_bytes)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Erreur de lecture de « {file.filename} » : {e}")

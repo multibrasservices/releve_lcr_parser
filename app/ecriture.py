@@ -67,10 +67,16 @@ def date_ecriture(lignes):
 
 def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece=""):
     """
-    lignes           : sortie de parse_lcr (echeance, tireur, operation, montant)
+    lignes           : sortie de parse_lcr (echeance, tireur, operation, montant, releve)
     societe          : {nom, pcg_512, code_journal, nature, reglement}
     comptes_tireurs  : {tireur normalisé: compte 401}
-    date_piece       : 'YYYY-MM-DD' pour forcer la date d'écriture (défaut : échéance max)
+    date_piece       : force la date des lignes 512 (défaut : échéance du relevé)
+
+    **1 relevé = 1 écriture** : chaque relevé chargé produit ses lignes 401 SUIVIES
+    de SA ligne 512. Charger 3 relevés donne donc 3 lignes 512, pas une seule —
+    sinon les trois prélèvements bancaires seraient soldés par un seul mouvement.
+    Le regroupement se fait sur le fichier d'origine (`releve`), à défaut sur
+    l'échéance (lignes ajoutées à la main dans l'interface).
 
     Retourne la liste des lignes JoGADM (dicts, 11 colonnes).
     Lève EcritureIncomplete si un tireur n'a pas de compte.
@@ -83,47 +89,54 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
     if manquants:
         raise EcritureIncomplete(manquants)
 
-    date_releve = _jj_mm_aaaa(date_piece or date_ecriture(lignes))
     jo = str(societe.get("code_journal") or "").strip()
     nature = (societe.get("nature") or "DI").strip()
     reglement = (societe.get("reglement") or "CA").strip()
 
-    ecriture = []
-    total = 0
+    # groupes ordonnés par échéance, dans l'ordre d'apparition
+    groupes = {}
     for ligne in lignes:
-        cents = _centimes(ligne["montant"])
-        total += cents
-        echeance = _jj_mm_aaaa(ligne["echeance"])
+        groupes.setdefault(ligne.get("releve") or ligne["echeance"], []).append(ligne)
+
+    ecriture = []
+    for cle in sorted(groupes, key=lambda k: date_ecriture(groupes[k])):
+        du_releve = groupes[cle]
+        date_releve = _jj_mm_aaaa(date_piece or date_ecriture(du_releve))
+        total = 0
+        for ligne in du_releve:
+            cents = _centimes(ligne["montant"])
+            total += cents
+            echeance = _jj_mm_aaaa(ligne["echeance"])
+            ecriture.append({
+                # date d'écriture = échéance de l'effet (règle Chef : les deux dates
+                # sont celles du relevé, jamais une date de traitement)
+                "Date": echeance,
+                "Jo": jo,
+                "Nature": nature,
+                "Pcg": pcg8(comptes_tireurs[normaliser_tireur(ligne["tireur"])]),
+                "Pièce": piece,
+                # Lib1 : « LCR mm.aa » sur TOUTES les lignes ; Lib2 : le fournisseur
+                "Libéllé1": f"LCR {echeance[3:5]}.{echeance[8:]}"[:LIB_MAX],
+                "Libéllé2": str(ligne["tireur"]).strip()[:LIB_MAX],
+                "D": _montant(cents),
+                "C": "",
+                "Règlement": reglement,
+                "Echeance": echeance,
+            })
+
         ecriture.append({
-            # date d'écriture = échéance de l'effet (règle Chef : les deux dates
-            # sont celles du relevé, jamais une date de traitement)
-            "Date": echeance,
+            "Date": date_releve,
             "Jo": jo,
             "Nature": nature,
-            "Pcg": pcg8(comptes_tireurs[normaliser_tireur(ligne["tireur"])]),
+            "Pcg": pcg8(societe["pcg_512"]),
             "Pièce": piece,
-            # Lib1 : « LCR mm.aa » sur TOUTES les lignes ; Lib2 : le fournisseur
-            "Libéllé1": f"LCR {echeance[3:5]}.{echeance[8:]}"[:LIB_MAX],
-            "Libéllé2": str(ligne["tireur"]).strip()[:LIB_MAX],
-            "D": _montant(cents),
-            "C": "",
+            "Libéllé1": f"LCR {date_releve[3:5]}.{date_releve[8:]}"[:LIB_MAX],
+            "Libéllé2": str(societe.get("nom") or "")[:LIB_MAX],
+            "D": "",
+            "C": _montant(total),
             "Règlement": reglement,
-            "Echeance": echeance,
+            "Echeance": date_releve,
         })
-
-    ecriture.append({
-        "Date": date_releve,
-        "Jo": jo,
-        "Nature": nature,
-        "Pcg": pcg8(societe["pcg_512"]),
-        "Pièce": piece,
-        "Libéllé1": f"LCR {date_releve[3:5]}.{date_releve[8:]}"[:LIB_MAX],
-        "Libéllé2": str(societe.get("nom") or "")[:LIB_MAX],
-        "D": "",
-        "C": _montant(total),
-        "Règlement": reglement,
-        "Echeance": date_releve,
-    })
 
     controler_equilibre(ecriture)
     return ecriture
