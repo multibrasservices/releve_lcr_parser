@@ -102,8 +102,9 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
             "Nature": nature,
             "Pcg": pcg8(comptes_tireurs[normaliser_tireur(ligne["tireur"])]),
             "Pièce": piece,
-            "Libéllé1": str(ligne["tireur"]).strip()[:LIB_MAX],
-            "Libéllé2": str(ligne.get("operation") or "").strip()[:LIB_MAX],
+            # Lib1 : « LCR mm.aa » sur TOUTES les lignes ; Lib2 : le fournisseur
+            "Libéllé1": f"LCR {echeance[3:5]}.{echeance[8:]}"[:LIB_MAX],
+            "Libéllé2": str(ligne["tireur"]).strip()[:LIB_MAX],
             "D": _montant(cents),
             "C": "",
             "Règlement": reglement,
