@@ -35,6 +35,18 @@ def normaliser_tireur(nom):
     return " ".join(str(nom or "").split()).upper()
 
 
+def pcg8(compte):
+    """
+    Compte général sur 8 caractères, complété par des zéros à droite (`6156` → `61560000`).
+    Indispensable : une longueur ≠ 8 fait basculer la ligne en analytique côté GADM, et
+    la colonne char(8) de Postgres complète avec des ESPACES — jamais un compte valide.
+    """
+    chiffres = "".join(c for c in str(compte or "") if c.isdigit())
+    if not chiffres:
+        raise ValueError(f"Compte invalide : « {compte} »")
+    return (chiffres + "00000000")[:8]
+
+
 def _centimes(montant):
     return int(round(float(montant) * 100))
 
@@ -85,7 +97,7 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
             "Date": date,
             "Jo": jo,
             "Nature": nature,
-            "Pcg": comptes_tireurs[normaliser_tireur(ligne["tireur"])],
+            "Pcg": pcg8(comptes_tireurs[normaliser_tireur(ligne["tireur"])]),
             "Pièce": piece,
             "Libéllé1": str(ligne["tireur"]).strip()[:LIB_MAX],
             "Libéllé2": str(ligne.get("operation") or "").strip()[:LIB_MAX],
@@ -100,7 +112,7 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
         "Date": date,
         "Jo": jo,
         "Nature": nature,
-        "Pcg": societe["pcg_512"],
+        "Pcg": pcg8(societe["pcg_512"]),
         "Pièce": piece,
         "Libéllé1": f"LCR {date[3:5]}.{date[8:]}"[:LIB_MAX],
         "Libéllé2": str(societe.get("nom") or "")[:LIB_MAX],

@@ -291,6 +291,19 @@
             <select id="societe" style="margin-left:.5rem;padding:8px;border:1px solid var(--gray-border);border-radius:8px;"></select>
           </label>
           <span id="societe-param" class="muted" style="font-size:.88rem;"></span>
+          <button class="btn btn-ghost" id="btn-params" style="display:none;margin-left:auto;">⚙ Paramètres</button>
+        </div>
+
+        <div id="params" style="display:none;margin-bottom:1rem;">
+          <p style="margin-bottom:.5rem;">Compte banque et journal GADM de chaque société :</p>
+          <div class="table-scroll">
+            <table class="data">
+              <thead><tr><th>Société</th><th style="width:150px;">Compte 512</th><th style="width:90px;">Journal</th>
+                         <th style="width:90px;">Nature</th><th style="width:110px;">Règlement</th></tr></thead>
+              <tbody id="params-body"></tbody>
+            </table>
+          </div>
+          <div class="toolbar"><button class="btn btn-ghost" id="btn-save-params">Enregistrer les paramètres</button></div>
         </div>
 
         <div id="tireurs-manquants" style="display:none;margin-bottom:1rem;">
@@ -665,7 +678,7 @@
         $param.textContent = `banque ${societe.pcg_512} · journal ${societe.code_journal} · ${societe.nature}/${societe.reglement}`;
         const { data } = await sb.from('lcr_tireurs').select('tireur,pcg_401').eq('societe_id', societe.id);
         comptes = {};
-        (data || []).forEach(t => { comptes[t.tireur] = t.pcg_401; });
+        (data || []).forEach(t => { comptes[t.tireur] = (t.pcg_401 || '').trim(); });
         majManquants();
       }
 
@@ -686,7 +699,7 @@
       document.getElementById('btn-save-tireurs').addEventListener('click', async () => {
         const societe = societeCourante();
         const saisies = [...$tireursBody.querySelectorAll('input')]
-          .map(i => ({ societe_id: societe.id, tireur: i.dataset.tireur, pcg_401: i.value.trim() }))
+          .map(i => ({ societe_id: societe.id, tireur: i.dataset.tireur, pcg_401: pcg8(i.value) }))
           .filter(t => t.pcg_401);
         if (!saisies.length) { showResult('error', 'Aucun compte saisi.'); return; }
         const { error } = await sb.from('lcr_tireurs').upsert(saisies, { onConflict: 'societe_id,tireur' });
@@ -742,8 +755,64 @@
         $infoGadm.textContent = `${lignes.length} lignes · équilibrée.`;
       }
 
+      // ── Paramètres société (super_admin / user_admin uniquement) ──────────
+      // Le compte 512 et le journal pilotent l'import GADM : une erreur ici bloque
+      // tout le monde. La RLS (lcr_is_admin) reste la vraie barrière, ce bouton
+      // n'est que le confort d'accès.
+      const $params = document.getElementById('params');
+      const $paramsBody = document.getElementById('params-body');
+
+      // Compte général sur 8 caractères, complété par des zéros (61 56 → 61560000)
+      const pcg8 = (v) => {
+        const chiffres = String(v || '').replace(/\D/g, '');
+        return chiffres ? (chiffres + '00000000').slice(0, 8) : '';
+      };
+
+      async function estAdmin() {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) return false;
+        const { data } = await sb.from('user_services')
+          .select('role').eq('user_id', session.user.id).eq('service_id', SERVICE_ID);
+        return (data || []).some(r => ['super_admin', 'user_admin'].includes(r.role));
+      }
+
+      function renderParams() {
+        $paramsBody.innerHTML = societes.map(s => `
+          <tr data-id="${s.id}">
+            <td>${s.nom}</td>
+            <td><input class="p-512" maxlength="8" value="${s.pcg_512.trim()}" style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td>
+            <td><input class="p-jo" maxlength="2" value="${s.code_journal}" style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td>
+            <td><input class="p-nat" maxlength="2" value="${s.nature}" style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td>
+            <td><input class="p-reg" maxlength="2" value="${s.reglement}" style="width:100%;padding:6px;border:1px solid var(--gray-border);border-radius:6px;"></td>
+          </tr>`).join('');
+      }
+
+      document.getElementById('btn-params').addEventListener('click', () => {
+        const ouvert = $params.style.display !== 'none';
+        $params.style.display = ouvert ? 'none' : '';
+        if (!ouvert) renderParams();
+      });
+
+      document.getElementById('btn-save-params').addEventListener('click', async () => {
+        for (const tr of $paramsBody.querySelectorAll('tr')) {
+          const compte = pcg8(tr.querySelector('.p-512').value);
+          if (!compte) { showResult('error', 'Compte 512 manquant.'); return; }
+          const { error } = await sb.from('lcr_societes').update({
+            pcg_512: compte,
+            code_journal: tr.querySelector('.p-jo').value.trim(),
+            nature: tr.querySelector('.p-nat').value.trim().toUpperCase(),
+            reglement: tr.querySelector('.p-reg').value.trim().toUpperCase(),
+          }).eq('id', tr.dataset.id);
+          if (error) { showResult('error', 'Enregistrement refusé : ' + error.message); return; }
+        }
+        $params.style.display = 'none';
+        await chargerSocietes();
+      });
+
       window.majEcritureGadm = () => { if (societes.length) { majManquants(); } };
-      chargerSocietes();
+      chargerSocietes().then(async () => {
+        if (await estAdmin()) document.getElementById('btn-params').style.display = '';
+      });
     })();
   </script>
 </body>
