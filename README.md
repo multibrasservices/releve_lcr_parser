@@ -1,9 +1,13 @@
-# Synthèse LCR → Excel
+# Synthèse LCR → Excel & écriture GADM
 
 Micro-service ZoomAli.io / MultiBrasServices : extrait les opérations d'un ou
 plusieurs relevés LCR PDF (banque Chabrières), permet de pointer les opérations
 déjà saisies, affiche une synthèse + un graphique interactif, et exporte le tout
 en Excel (avec histogramme empilé par date et par tireur).
+
+Depuis le 27/07/2026, il produit aussi l'**écriture comptable** du relevé
+(multi-société) et l'envoie directement à `gadm.zoomali.io` — voir
+« Écriture comptable GADM » plus bas.
 
 Remplace l'ancienne app Streamlit. Architecture identique à `rm-expert-journal-ventes` :
 **FastAPI sert à la fois l'API et un front HTML/JS vanilla** — un seul conteneur.
@@ -12,14 +16,18 @@ Remplace l'ancienne app Streamlit. Architecture identique à `rm-expert-journal-
 
 ```
 app/
-├── main.py       FastAPI : GET / · /login.html · /config.js · POST /parse · /export
-├── parser.py     Extraction déterministe des relevés LCR (pdfplumber)
-├── exporter.py   Génération du classeur Excel (pandas + XlsxWriter)
+├── main.py       FastAPI : GET / · /login.html · /config.js · POST /parse · /export · /gadm · /gadm/xlsx
+├── parser.py     Extraction déterministe des relevés LCR + détection du tiré (pdfplumber)
+├── ecriture.py   Relevé → écriture JoGADM 11 colonnes (déterministe, contrôlée)
+├── exporter.py   Classeurs Excel : synthèse et journal 11 colonnes (pandas + XlsxWriter)
 └── static/
     ├── index.html  SPA vanilla (Supabase JS + Chart.js via CDN)
     ├── login.html  Page de login locale brandée (filigrane logo)
-    └── images/     logo
+    └── images/     logos (LCR, GADM)
 ```
+
+Migrations SQL du paramétrage : `supabase/001_lcr_socle_gadm.sql`,
+`supabase/002_lcr_parametres_admin.sql`.
 
 | Méthode | Route         | Auth            | Rôle                                            |
 |---------|---------------|-----------------|-------------------------------------------------|
@@ -28,6 +36,8 @@ app/
 | GET     | `/config.js`  | non             | Injecte la config runtime (`window.LCR_CONFIG`) |
 | POST    | `/parse`      | **JWT + accès** | PDF(s) → JSON des opérations extraites          |
 | POST    | `/export`     | **JWT + accès** | JSON (lignes éditées) → fichier `.xlsx`         |
+| POST    | `/gadm`       | **JWT + accès** | Opérations + société + comptes → écriture JoGADM + TSV |
+| POST    | `/gadm/xlsx`  | **JWT + accès** | Même écriture → classeur Excel 11 colonnes      |
 
 ## Contrôle d'accès (deux niveaux)
 
@@ -39,8 +49,9 @@ app/
   `{SUPABASE_URL}/auth/v1/user`, puis exige une ligne
   `user_services(user_id, SERVICE_ID)` → `401` / `403` sinon.
 
-Toutes les données sont traitées **en mémoire** (aucune table métier, donc pas de
-RLS à poser) : le verrou `user_services` côté backend est la barrière.
+Les relevés sont traités **en mémoire** (aucune opération bancaire stockée) : le verrou
+`user_services` côté backend est la barrière. Seul le **paramétrage** vit en base
+(`lcr_societes`, `lcr_tireurs`), protégé par RLS d'appartenance au service.
 
 ## Écriture comptable GADM (règles métier)
 
