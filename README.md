@@ -42,6 +42,33 @@ app/
 Toutes les données sont traitées **en mémoire** (aucune table métier, donc pas de
 RLS à poser) : le verrou `user_services` côté backend est la barrière.
 
+## Écriture comptable GADM (règles métier)
+
+**1 relevé PDF = 1 écriture** : N lignes `401` au débit (une par opération, compte du
+tireur) + **1 ligne `512` au crédit** par relevé (le prélèvement réellement passé en
+banque). Charger 3 relevés produit donc 3 lignes 512 — le regroupement se fait sur le
+fichier d'origine (`releve`, posé par `/parse`).
+
+- **Dates** : date d'écriture = échéance de l'effet, sur chaque ligne (jamais une date
+  de traitement). La ligne 512 porte l'échéance du relevé.
+- **Libellés** : `Libéllé1` = `LCR mm.aa` sur toutes les lignes ; `Libéllé2` = le
+  fournisseur (nom de la société sur la ligne banque).
+- **Comptes sur 8 caractères**, complétés par des zéros (`pcg8`) : une longueur ≠ 8
+  bascule la ligne en analytique dans GADM, et la colonne `char(8)` de Postgres
+  complèterait aux espaces.
+- **Tireur sans compte 401 → génération refusée** (jamais d'imputation devinée), et
+  **ΣD = ΣC contrôlé en centimes** avant toute sortie.
+- La société est **détectée sur le relevé** (« Tiré : LAMPROIE SAS ») et présélectionnée.
+
+Paramétrage en base (Supabase, RLS par appartenance au service) :
+`lcr_societes` (compte 512, journal, nature, règlement — **écriture réservée à
+super_admin / user_admin** via `lcr_is_admin()`) et `lcr_tireurs` (mapping
+« Nom du Tireur » → compte 401, CRUD dans l'app). Migrations : `supabase/001`, `002`.
+
+Sorties : **Excel 11 colonnes** (`/gadm/xlsx`) et **« Envoyer vers GADM »** — le journal
+voyage dans le fragment d'URL de `gadm.zoomali.io`, sans transiter par un serveur
+(contrat : repo `gadm`, `docs/envoyer-un-journal-a-gadm.md` ; skill `gadm-pont-handoff`).
+
 ## Développement local
 
 ```bash
