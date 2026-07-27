@@ -11,7 +11,7 @@ from app.ecriture import EcritureIncomplete, construire_ecriture, tsv_jogadm
 from app.exporter import build_xlsx, build_xlsx_gadm
 from app.parser import parse_lcr
 
-APP_VERSION = "2026.06.18-1"
+APP_VERSION = "27.07.26-1"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
