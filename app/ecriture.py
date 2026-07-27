@@ -61,7 +61,7 @@ def _montant(cents):
 
 
 def date_ecriture(lignes):
-    """Date de l'écriture = échéance la plus tardive du relevé (la date du prélèvement)."""
+    """Date du relevé = échéance la plus tardive (sert à la ligne 512 et au libellé)."""
     return max(l["echeance"] for l in lignes)
 
 
@@ -83,7 +83,7 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
     if manquants:
         raise EcritureIncomplete(manquants)
 
-    date = _jj_mm_aaaa(date_piece or date_ecriture(lignes))
+    date_releve = _jj_mm_aaaa(date_piece or date_ecriture(lignes))
     jo = str(societe.get("code_journal") or "").strip()
     nature = (societe.get("nature") or "DI").strip()
     reglement = (societe.get("reglement") or "CA").strip()
@@ -93,8 +93,11 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
     for ligne in lignes:
         cents = _centimes(ligne["montant"])
         total += cents
+        echeance = _jj_mm_aaaa(ligne["echeance"])
         ecriture.append({
-            "Date": date,
+            # date d'écriture = échéance de l'effet (règle Chef : les deux dates
+            # sont celles du relevé, jamais une date de traitement)
+            "Date": echeance,
             "Jo": jo,
             "Nature": nature,
             "Pcg": pcg8(comptes_tireurs[normaliser_tireur(ligne["tireur"])]),
@@ -104,22 +107,21 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
             "D": _montant(cents),
             "C": "",
             "Règlement": reglement,
-            # échéance réelle de l'effet, pas la date d'écriture
-            "Echeance": _jj_mm_aaaa(ligne["echeance"]),
+            "Echeance": echeance,
         })
 
     ecriture.append({
-        "Date": date,
+        "Date": date_releve,
         "Jo": jo,
         "Nature": nature,
         "Pcg": pcg8(societe["pcg_512"]),
         "Pièce": piece,
-        "Libéllé1": f"LCR {date[3:5]}.{date[8:]}"[:LIB_MAX],
+        "Libéllé1": f"LCR {date_releve[3:5]}.{date_releve[8:]}"[:LIB_MAX],
         "Libéllé2": str(societe.get("nom") or "")[:LIB_MAX],
         "D": "",
         "C": _montant(total),
         "Règlement": reglement,
-        "Echeance": date,
+        "Echeance": date_releve,
     })
 
     controler_equilibre(ecriture)
