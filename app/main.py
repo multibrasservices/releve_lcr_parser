@@ -1,17 +1,19 @@
+import json
 import os
 import urllib.parse
 from pathlib import Path
 
 import httpx
-from fastapi import Body, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from app.doublons import detecter_doublons, parser_fec_txt
 from app.ecriture import EcritureIncomplete, construire_ecriture, tsv_jogadm
 from app.exporter import build_xlsx, build_xlsx_gadm
 from app.parser import detecter_tire, parse_lcr
 
-APP_VERSION = "27.07.26-10"
+APP_VERSION = "11.09.26-1"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -184,6 +186,32 @@ async def gadm_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{nom}"},
     )
+
+
+@app.post("/doublons/check")
+async def doublons_check(
+    file: UploadFile = File(...),
+    lignes: str = Form(...),
+    authorization: str = Header(default=""),
+):
+    """Contrôle anti-doublon OPTIONNEL : compare l'écriture (sortie de /gadm) au FEC
+    déjà comptabilisé, sur les lignes de tiers (401) — compte + date + débit + crédit.
+    FEC lu en mémoire pour cette seule requête, jamais stocké (règle 16 RGPD).
+    Rapport NON bloquant (DAAT) : l'humain tranche."""
+    await _require_auth(authorization)
+    try:
+        ecriture = json.loads(lignes)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Écriture illisible.")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Fichier FEC vide.")
+    try:
+        fec_df = parser_fec_txt(raw)
+        doublons = detecter_doublons(ecriture, fec_df)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"doublons": doublons, "total_401": sum(1 for l in ecriture if str(l.get("Pcg", "")).startswith("401"))}
 
 
 @app.post("/export")

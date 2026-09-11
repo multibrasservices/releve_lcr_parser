@@ -347,6 +347,15 @@
           </a>
         </div>
         <div id="gadm-info" class="muted" style="font-size:.88rem;margin-top:.6rem;"></div>
+
+        <div class="export-row" style="margin-top:.8rem;">
+          <input type="file" id="fec-doublons-input" accept=".txt,text/plain" style="display:none">
+          <button class="btn btn-ghost" id="btn-doublons" style="width:auto;margin:0;"
+                  title="Dépose le FEC déjà comptabilisé : compare compte + date + montant, signale sans bloquer.">
+            🔁 Doublons (FEC)
+          </button>
+        </div>
+        <div id="doublons-info" style="font-size:.88rem;margin-top:.4rem;"></div>
       </div>
     </div>
 
@@ -453,6 +462,7 @@
       // ════════════════════════════════════════════════════════════════
       let rows = [];          // {echeance, echeance_display, tireur, operation, montant, saisi}
       let chart = null;
+      let derniereEcriture = [];   // dernière écriture générée (/gadm) — pour le contrôle doublons
 
       const $dropzone = document.getElementById('dropzone');
       const $input    = document.getElementById('file-input');
@@ -797,9 +807,43 @@
         $envoi.href = `https://gadm.zoomali.io/#j=${b64}&n=${encodeURIComponent(nom)}`;
         $envoi.style.display = 'inline-flex';
         renderApercu(lignes);
+        derniereEcriture = lignes;
+        document.getElementById('doublons-info').innerHTML = '';
         const totalC = lignes.reduce((s, l) => s + (parseFloat(l.C) || 0), 0);
         $infoGadm.textContent = `${lignes.length} lignes · total ${totalC.toFixed(2)} € · équilibrée.`;
       }
+
+      // Contrôle anti-doublon (optionnel) : compare l'écriture au FEC déjà comptabilisé.
+      // Non bloquant (DAAT) — l'humain tranche. Rien n'est stocké côté serveur.
+      const $doublonsInfo = document.getElementById('doublons-info');
+      document.getElementById('btn-doublons').addEventListener('click', () => {
+        if (!derniereEcriture.length) { showResult('error', 'Génère d’abord l’écriture (Excel 11 colonnes ou Envoyer vers GADM).'); return; }
+        document.getElementById('fec-doublons-input').click();
+      });
+      document.getElementById('fec-doublons-input').addEventListener('change', async (e) => {
+        const fichier = e.target.files[0];
+        e.target.value = '';
+        if (!fichier) return;
+        $doublonsInfo.textContent = 'Vérification…';
+        const form = new FormData();
+        form.append('file', fichier);
+        form.append('lignes', JSON.stringify(derniereEcriture));
+        const resp = await fetch('/doublons/check', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + currentToken },
+          body: form,
+        });
+        if (!resp.ok) {
+          const body = await resp.json().catch(() => ({}));
+          $doublonsInfo.innerHTML = `<span style="color:var(--red,#c0392b);">FEC illisible : ${body.detail || resp.status}</span>`;
+          return;
+        }
+        const { doublons } = await resp.json();
+        $doublonsInfo.innerHTML = doublons.length
+          ? `⚠️ <b>${doublons.length}</b> ligne(s) ressemblent à une écriture déjà dans le FEC : ` +
+            doublons.map(l => `${l.Libéllé2 || ''} ${l.Echeance} (${l.D || l.C}€)`).join(' · ')
+          : '✅ Aucun doublon détecté contre ce FEC.';
+      });
 
       // ── Paramètres société (super_admin / user_admin uniquement) ──────────
       // Le compte 512 et le journal pilotent l'import GADM : une erreur ici bloque

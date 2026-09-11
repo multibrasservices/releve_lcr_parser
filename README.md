@@ -76,6 +76,12 @@ Paramétrage en base (Supabase, RLS par appartenance au service) :
 super_admin / user_admin** via `lcr_is_admin()`) et `lcr_tireurs` (mapping
 « Nom du Tireur » → compte 401, CRUD dans l'app). Migrations : `supabase/001`, `002`.
 
+**Contrôle anti-doublon (optionnel, 11/09/2026)** : bouton « 🔁 Doublons (FEC) » — dépose le
+FEC déjà comptabilisé, compare les lignes 401 de l'écriture générée (compte + date +
+débit/crédit, en centimes) et signale les correspondances, sans bloquer l'envoi. FEC lu en
+mémoire pour la requête (`POST /doublons/check`), jamais stocké. Même principe que
+`invoice.zoomali.io`.
+
 Sorties : **Excel 11 colonnes** (`/gadm/xlsx`) et **« Envoyer vers GADM »** — le journal
 voyage dans le fragment d'URL de `gadm.zoomali.io`, sans transiter par un serveur
 (contrat : repo `gadm`, `docs/envoyer-un-journal-a-gadm.md` ; skill `gadm-pont-handoff`).
