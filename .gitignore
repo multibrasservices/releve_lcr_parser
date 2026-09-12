@@ -14,3 +14,7 @@ __pycache__/
 # Fichiers de test / sorties
 *.pdf
 *.xlsx
+
+# Poste de travail des bras (planificateur-executant)
+.volets/
+BRIEF.md
