@@ -1,6 +1,6 @@
 # Synthèse LCR → Excel & écriture GADM
 
-*Version 12.09.26-1.*
+*Version 12.09.26-2.*
 
 Micro-service ZoomAli.io / MultiBrasServices : extrait les opérations d'un ou
 plusieurs relevés LCR PDF (banque Chabrières), permet de pointer les opérations

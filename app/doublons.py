@@ -41,7 +41,7 @@ def _date_yyyymmdd(date_jj_mm_aaaa_ou_texte):
 
 def parser_fec_txt(raw_bytes):
     """Lit un FEC (.txt, norme DGFiP) en DataFrame. Détecte l'encodage et le séparateur
-    (tabulation ou point-virgule) — 100% local, aucune dépendance externe."""
+    (barre verticale comme l'exporte la GADM, tabulation ou point-virgule) — 100% local."""
     texte = None
     for enc in ("utf-8-sig", "cp1252", "latin-1"):
         try:
@@ -51,7 +51,9 @@ def parser_fec_txt(raw_bytes):
             continue
     if texte is None:
         raise ValueError("encodage du FEC non reconnu")
-    sep = "\t" if texte.count("\t") >= texte.count(";") else ";"
+    # séparateur = le plus présent dans l'en-tête : « | » (GADM), tabulation ou « ; »
+    en_tete = texte.split("\n", 1)[0]
+    sep = max(("|", "\t", ";"), key=en_tete.count)
     df = pd.read_csv(io.StringIO(texte), sep=sep, dtype=str, engine="python")
     df.columns = [c.strip() for c in df.columns]
     return df

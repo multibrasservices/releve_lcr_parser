@@ -1,1 +1,2 @@
 12/09 bras-lcr — une écriture = une seule date : regroupement par (relevé, échéance) + garde-fou controler_dates, 4 tests pytest verts, vérifié sur le PDF BAKITO 80101564517-LCR-20260904 (2 blocs : 748,28 au 11/09, 1360,06 au 14/09) ; version 12.09.26-1 posée dans le code et le README, vignette portail non mise à jour (version-zoomali.sh ne reconnaît pas app/main.py) ; pas poussé.
+12/09 bras-lcr — contrôle doublons : le FEC GADM (séparateur « | ») se lit enfin, 2 tests ajoutés (8 verts), vérifié sur B_fec26.txt (16 209 lignes) ; version 12.09.26-2 ; pas poussé.

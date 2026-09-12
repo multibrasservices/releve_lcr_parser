@@ -13,7 +13,7 @@ from app.ecriture import EcritureIncomplete, construire_ecriture, tsv_jogadm
 from app.exporter import build_xlsx, build_xlsx_gadm
 from app.parser import detecter_tire, parse_lcr
 
-APP_VERSION = "12.09.26-1"
+APP_VERSION = "12.09.26-2"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
