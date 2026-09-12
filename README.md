@@ -1,5 +1,7 @@
 # Synthèse LCR → Excel & écriture GADM
 
+*Version 12.09.26-1.*
+
 Micro-service ZoomAli.io / MultiBrasServices : extrait les opérations d'un ou
 plusieurs relevés LCR PDF (banque Chabrières), permet de pointer les opérations
 déjà saisies, affiche une synthèse + un graphique interactif, et exporte le tout
@@ -58,10 +60,13 @@ Les relevés sont traités **en mémoire** (aucune opération bancaire stockée)
 **1 relevé PDF = 1 écriture** : N lignes `401` au débit (une par opération, compte du
 tireur) + **1 ligne `512` au crédit** par relevé (le prélèvement réellement passé en
 banque). Charger 3 relevés produit donc 3 lignes 512 — le regroupement se fait sur le
-fichier d'origine (`releve`, posé par `/parse`).
+fichier d'origine (`releve`, posé par `/parse`) **et sur l'échéance** : une écriture n'a
+qu'une date, donc un relevé à plusieurs échéances donne plusieurs écritures (la GADM
+refuse un bloc aux dates mélangées ; un garde-fou `controler_dates` le vérifie).
 
 - **Dates** : date d'écriture = échéance de l'effet, sur chaque ligne (jamais une date
-  de traitement). La ligne 512 porte l'échéance du relevé.
+  de traitement). La ligne 512 porte la même date que ses 401. Si `date_piece` est
+  fourni, toutes les lignes prennent cette `Date` ; `Echeance` garde l'échéance réelle.
 - **Libellés** : `Libéllé1` = `LCR mm.aa` sur toutes les lignes ; `Libéllé2` = le
   fournisseur (nom de la société sur la ligne banque).
 - **Comptes sur 8 caractères**, complétés par des zéros (`pcg8`) : une longueur ≠ 8

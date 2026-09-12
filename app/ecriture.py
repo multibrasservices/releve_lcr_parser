@@ -4,6 +4,10 @@ Règle métier (Chef, 27/07/2026) : **1 PDF = 1 écriture**
   - N lignes 401 au DÉBIT : une par opération du relevé, sur le compte du tireur
   - 1 ligne 512 au CRÉDIT : le total prélevé par la banque
 
+Et **une écriture n'a qu'une date** (Chef, 12/09/2026) : la GADM refuse un bloc dont
+les lignes portent des dates différentes. Un PDF qui contient plusieurs relevés à des
+échéances différentes donne donc plusieurs écritures, une par échéance.
+
 100 % déterministe (règle 10) : aucune IA, aucun compte deviné. Un tireur absent du
 paramétrage est signalé, jamais imputé au hasard.
 
@@ -70,13 +74,16 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
     lignes           : sortie de parse_lcr (echeance, tireur, operation, montant, releve)
     societe          : {nom, pcg_512, code_journal, nature, reglement}
     comptes_tireurs  : {tireur normalisé: compte 401}
-    date_piece       : force la date des lignes 512 (défaut : échéance du relevé)
+    date_piece       : force la colonne Date de TOUTES les lignes (401 et 512) ;
+                       la colonne Echeance garde l'échéance réelle de chaque effet
 
     **1 relevé = 1 écriture** : chaque relevé chargé produit ses lignes 401 SUIVIES
     de SA ligne 512. Charger 3 relevés donne donc 3 lignes 512, pas une seule —
     sinon les trois prélèvements bancaires seraient soldés par un seul mouvement.
-    Le regroupement se fait sur le fichier d'origine (`releve`), à défaut sur
-    l'échéance (lignes ajoutées à la main dans l'interface).
+
+    **1 écriture = 1 date** : le regroupement se fait sur (`releve`, `echeance`).
+    Un PDF à deux dates de règlement (cas BAKITO 12/09/2026) donne deux écritures,
+    chacune datée de son échéance ; un PDF à une seule échéance, une seule — comme avant.
 
     Retourne la liste des lignes JoGADM (dicts, 11 colonnes).
     Lève EcritureIncomplete si un tireur n'a pas de compte.
@@ -93,13 +100,13 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
     nature = (societe.get("nature") or "DI").strip()
     reglement = (societe.get("reglement") or "CA").strip()
 
-    # groupes ordonnés par échéance, dans l'ordre d'apparition
+    # un groupe = un relevé ET une échéance : toutes ses lignes portent la même date
     groupes = {}
     for ligne in lignes:
-        groupes.setdefault(ligne.get("releve") or ligne["echeance"], []).append(ligne)
+        groupes.setdefault((ligne.get("releve") or "", ligne["echeance"]), []).append(ligne)
 
     ecriture = []
-    for cle in sorted(groupes, key=lambda k: date_ecriture(groupes[k])):
+    for cle in sorted(groupes, key=lambda k: (date_ecriture(groupes[k]), k[0])):
         du_releve = groupes[cle]
         date_releve = _jj_mm_aaaa(date_piece or date_ecriture(du_releve))
         total = 0
@@ -109,8 +116,9 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
             echeance = _jj_mm_aaaa(ligne["echeance"])
             ecriture.append({
                 # date d'écriture = échéance de l'effet (règle Chef : les deux dates
-                # sont celles du relevé, jamais une date de traitement)
-                "Date": echeance,
+                # sont celles du relevé, jamais une date de traitement) — ou la
+                # date_piece imposée, la même pour tout le bloc
+                "Date": date_releve,
                 "Jo": jo,
                 "Nature": nature,
                 "Pcg": pcg8(comptes_tireurs[normaliser_tireur(ligne["tireur"])]),
@@ -135,10 +143,11 @@ def construire_ecriture(lignes, societe, comptes_tireurs, date_piece=None, piece
             "D": "",
             "C": _montant(total),
             "Règlement": reglement,
-            "Echeance": date_releve,
+            "Echeance": _jj_mm_aaaa(date_ecriture(du_releve)),
         })
 
     controler_equilibre(ecriture)
+    controler_dates(ecriture)
     return ecriture
 
 
@@ -151,6 +160,26 @@ def controler_equilibre(ecriture):
             f"Écriture déséquilibrée : débit {debit / 100:.2f} ≠ crédit {credit / 100:.2f}"
         )
     return debit
+
+
+def controler_dates(ecriture):
+    """
+    Garde-fou : un bloc (les 401 jusqu'à leur 512) ne porte qu'une seule Date,
+    sinon la GADM refuse l'import. Ne doit jamais se déclencher tant que le
+    regroupement se fait par (releve, echeance) — il est là pour le jour où
+    quelqu'un change ce regroupement.
+    """
+    bloc = []
+    for ligne in ecriture:
+        bloc.append(ligne["Date"])
+        if ligne["C"]:  # la 512 clôt le bloc
+            dates = sorted(set(bloc))
+            if len(dates) > 1:
+                raise ValueError(
+                    f"Écriture du {ligne['Date']} : dates mélangées ({', '.join(dates)})"
+                )
+            bloc = []
+    return True
 
 
 def tsv_jogadm(ecriture):
