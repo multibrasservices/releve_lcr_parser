@@ -32,3 +32,9 @@ par Coolify OVH sur `main` (uuid `bahhlyso06vgow0y5tnvmjv1`). Les clients : l'é
 - `.volets/` et `BRIEF.md` sont le poste de travail d'un bras : ignorés par git, pas livrés.
 - Un bras lancé sur ce dépôt a exécuté des consignes qui n'étaient pas pour lui (12/09) :
   voir la compétence `planificateur-executant`, § « Le volet reçoit aussi… ».
+
+## Règle écosystème (15/09/2026) — la nature devant le libellé
+
+Le FEC n'a pas de colonne nature : `Libéllé1` commence par elle. Ici c'est déjà fait
+(`LCR mm.aa` sur toutes les lignes) — **ne pas l'enlever**. Le reste de la règle (VI, PR, CQ,
+EP, CB EX / SC / CK) vit dans `erb/src/engine/nature.ts` et la skill `gadm-ecriture-format`.
