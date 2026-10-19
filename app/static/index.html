@@ -370,6 +370,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://saaas.zoomali.io/double.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="/config.js"></script>
   <script>
@@ -426,6 +427,8 @@
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: { persistSession: true, autoRefreshToken: true, storage: sharedStorage }
       });
+      // Double sécurité : l'écran du code tant qu'il n'est pas donné pour cette session (19/10/2026).
+      ZoomAliDouble.surveiller(sb, SUPABASE_URL, SUPABASE_ANON_KEY);
 
       let currentToken = null;
 
